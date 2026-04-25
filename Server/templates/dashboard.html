@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SEB Monitoring Console</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #050505;
+            --surface: #0f0f11;
+            --surface-hover: #161619;
+            --border: #1e1e22;
+            --accent: #3b82f6;
+            --text-main: #f8fafc;
+            --text-dim: #64748b;
+            --active: #10b981;
+            --inactive: #334155;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 20px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        header {
+            max-width: 1400px;
+            margin: 0 auto 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .header-title h1 {
+            font-size: 1.5rem;
+            margin: 0;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        .header-title p {
+            margin: 5px 0 0;
+            color: var(--text-dim);
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .user-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            text-decoration: none;
+            color: inherit;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .user-card:hover {
+            border-color: var(--accent);
+            background: var(--surface-hover);
+            transform: translateY(-2px);
+        }
+
+        .card-header {
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .uid {
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--text-dim);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .status-on {
+            background: var(--active);
+            box-shadow: 0 0 8px var(--active);
+            color: var(--active);
+        }
+
+        .status-off {
+            background: var(--inactive);
+        }
+
+        .preview-box {
+            width: 100%;
+            aspect-ratio: 16/10;
+            background: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            border-top: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .preview-box img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0.8;
+            transition: opacity 0.2s;
+        }
+
+        .user-card:hover img {
+            opacity: 1;
+        }
+
+        .no-img {
+            color: #222;
+            font-size: 0.7rem;
+            font-weight: 800;
+            letter-spacing: 2px;
+        }
+
+        .card-footer {
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .time {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+        }
+
+        .ans-pill {
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--accent);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 700;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 15px;
+            }
+
+            header {
+                margin-bottom: 25px;
+            }
+
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+    <script>
+        setInterval(() => {
+            fetch('/dashboard').then(r => r.text()).then(html => {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                document.querySelector('.grid').innerHTML = doc.querySelector('.grid').innerHTML;
+            });
+        }, 5000);
+    </script>
+</head>
+
+<body>
+    <header>
+        <div class="header-title">
+            <h1>MONITORING CONSOLE</h1>
+            <p>15 ACTIVE NODES</p>
+        </div>
+    </header>
+    <div class="grid">
+        {% for uid, data in users.items() %}
+        <a href="/user/{{ uid }}" class="user-card">
+            <div class="card-header">
+                <span class="uid">NODE {{ "%02d"|format(uid|int) }}</span>
+                <div class="status-badge {{ 'status-on' if data.history else '' }}">
+                    <span class="status-dot {{ 'status-on' if data.history else 'status-off' }}"></span>
+                    {{ 'STREAMING' if data.history else 'IDLE' }}
+                </div>
+            </div>
+            <div class="preview-box">
+                {% if data.last_img %}
+                <img src="/screenshots/{{ data.last_img }}" alt="PVR">
+                {% else %}
+                <span class="no-img">SIGNAL LOST</span>
+                {% endif %}
+            </div>
+            <div class="card-footer">
+                <span class="time">{{ data.last_seen if data.last_seen != "Never" else "NO CONNECTION" }}</span>
+                {% if data.history %}
+                {% set last = data.history[-1] %}
+                <span class="ans-pill">RESULT: {{ "ABCD"[last.answer-1] if last.answer > 0 else "?" }}</span>
+                {% endif %}
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+</body>
+
+</html>
