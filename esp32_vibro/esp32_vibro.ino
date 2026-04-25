@@ -1,13 +1,13 @@
-#include <WiFi.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
+#include <WiFiClientSecure.h>
 
 // --- CONFIGURATION ---
 const char* ssid = "HomeWifi";
 const char* password = "11223344";
 
-// Use the IP address of your computer running the server
-const char* serverUrl = "http://192.168.0.121:5000/poll";
+// Use the Render Cloud URL
+const char* serverUrl = "https://exam-system-v1.onrender.com/poll";
 const char* secretKey = "super-secret-key";
 
 // Change this ID for each device (1-15)
@@ -50,13 +50,16 @@ void vibrate(int times) {
 
 void loop() {
   if (WiFi.status() == WL_CONNECTED) {
-    HTTPClient http;
-    String url = String(serverUrl) + "?user_id=" + String(USER_ID);
-    http.begin(url);
-    http.addHeader("X-Secret", secretKey);
-    http.setTimeout(5000); // 5 sec timeout
+    WiFiClientSecure *client = new WiFiClientSecure;
+    if(client) {
+      client->setInsecure(); // Skip SSL certificate verification
+      HTTPClient http;
+      String url = String(serverUrl) + "?user_id=" + String(USER_ID);
+      http.begin(*client, url);
+      http.addHeader("X-Secret", secretKey);
+      http.setTimeout(5000); // 5 sec timeout
 
-    int httpCode = http.GET();
+      int httpCode = http.GET();
     if (httpCode == 200) {
       String payload = http.getString();
       StaticJsonDocument<200> doc;
@@ -85,11 +88,9 @@ void loop() {
         Serial.print("JSON Parse Error: ");
         Serial.println(error.c_str());
       }
-    } else {
-      Serial.print("HTTP Error: ");
-      Serial.println(httpCode);
+      http.end();
+      delete client;
     }
-    http.end();
   } else {
     Serial.println("WiFi Disconnected. Reconnecting...");
     WiFi.begin(ssid, password);

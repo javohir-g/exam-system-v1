@@ -1,0 +1,11 @@
+# Environment secrets
+.env
+Server/.env
+Server/screenshots/
+Server/database.json
+
+# Build files
+*.exe
+*.bin
+build/
+.arduino/
