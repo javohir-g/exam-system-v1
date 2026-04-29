@@ -4,33 +4,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NODE {{ user_id }} HISTORY</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <title>Node {{ uid }} History</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg: #050505;
-            --surface: #0f0f11;
-            --border: #1e1e22;
-            --accent: #3b82f6;
-            --text-main: #f8fafc;
-            --text-dim: #64748b;
-        }
-
-        * {
-            box-sizing: border-box;
+            --bg: #030303;
+            --surface: rgba(15, 15, 18, 0.6);
+            --border: rgba(255, 255, 255, 0.08);
+            --accent: #00f2ff;
+            --text-main: #fcfcfc;
+            --text-dim: #94a3b8;
         }
 
         body {
             background: var(--bg);
+            background-image: radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.08) 0%, transparent 50%);
             color: var(--text-main);
-            font-family: 'Inter', sans-serif;
+            font-family: 'Outfit', sans-serif;
             margin: 0;
-            padding: 20px;
+            padding: 30px;
+            min-height: 100vh;
             -webkit-font-smoothing: antialiased;
         }
 
         .container {
-            max-width: 900px;
+            max-width: 1200px;
             margin: 0 auto;
         }
 
@@ -38,18 +36,15 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom: 1px solid var(--border);
-            padding-bottom: 20px;
             margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border);
         }
 
         .back-btn {
             color: var(--text-dim);
             text-decoration: none;
-            font-size: 0.75rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
+            font-size: 0.9rem;
             display: flex;
             align-items: center;
             gap: 8px;
@@ -61,126 +56,94 @@
         }
 
         h1 {
-            font-size: 1.25rem;
-            margin: 0;
+            font-size: 1.5rem;
             font-weight: 700;
+            margin: 0;
         }
 
-        .timeline {
-            display: flex;
-            flex-direction: column;
+        .history-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
             gap: 30px;
         }
 
-        .log-entry {
-            background: var(--surface);
+        .main-view {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .screenshot-large {
+            width: 100%;
+            border-radius: 20px;
             border: 1px solid var(--border);
-            border-radius: 16px;
-            display: grid;
-            grid-template-columns: 240px 1fr;
             overflow: hidden;
-            transition: border-color 0.2s;
-        }
-
-        .log-entry:hover {
-            border-color: #333;
-        }
-
-        .img-wrap {
-            cursor: pointer;
-            border-right: 1px solid var(--border);
             background: #000;
             position: relative;
         }
 
-        .log-img {
+        .screenshot-large img {
             width: 100%;
-            height: 100%;
-            object-fit: cover;
-            opacity: 0.9;
-            transition: opacity 0.2s;
+            display: block;
         }
 
-        .img-wrap:hover .log-img {
-            opacity: 1;
+        .timeline {
+            background: var(--surface);
+            backdrop-filter: blur(12px);
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            padding: 20px;
+            height: fit-content;
+            max-height: 80vh;
+            overflow-y: auto;
         }
 
-        .log-details {
-            padding: 24px;
-            display: flex;
-            flex-direction: column;
+        .event-card {
+            border-left: 2px solid var(--border);
+            padding-left: 20px;
+            margin-bottom: 25px;
+            position: relative;
         }
 
-        .ts {
+        .event-card::before {
+            content: '';
+            position: absolute;
+            left: -5px;
+            top: 0;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--border);
+        }
+
+        .event-card.active::before {
+            background: var(--accent);
+            box-shadow: 0 0 10px var(--accent);
+        }
+
+        .event-time {
             font-size: 0.75rem;
             color: var(--text-dim);
-            margin-bottom: 15px;
-            font-weight: 500;
+            margin-bottom: 5px;
+            font-family: monospace;
         }
 
-        .result-box {
-            margin-bottom: 20px;
-        }
-
-        .label {
-            font-size: 0.7rem;
-            color: var(--text-dim);
+        .event-answer {
             font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            margin-bottom: 4px;
-        }
-
-        .ans {
-            font-size: 2.5rem;
-            font-weight: 800;
             color: var(--accent);
-            line-height: 1;
+            font-size: 1.1rem;
         }
 
-        .reason {
-            font-size: 0.9rem;
-            color: #94a3b8;
-            line-height: 1.6;
-            margin-top: auto;
-            background: rgba(255, 255, 255, 0.02);
-            padding: 12px;
-            border-radius: 8px;
-            border-left: 2px solid var(--accent);
+        .event-reasoning {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            margin-top: 5px;
+            line-height: 1.4;
         }
 
-        /* Lightbox Overlay */
-        #overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.98);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            cursor: zoom-out;
-            backdrop-filter: blur(8px);
-        }
-
-        #overlay img {
-            max-width: 95%;
-            max-height: 95%;
-            border: 1px solid #333;
-            border-radius: 4px;
-        }
-
-        @media (max-width: 600px) {
-            .log-entry {
+        @media (max-width: 900px) {
+            .history-grid {
                 grid-template-columns: 1fr;
-            }
-
-            .img-wrap {
-                border-right: none;
-                border-bottom: 1px solid var(--border);
-                aspect-ratio: 16/9;
             }
         }
     </style>
@@ -189,39 +152,31 @@
 <body>
     <div class="container">
         <header>
-            <a href="/dashboard" class="back-btn">&larr; CONSOLE</a>
-            <h1>NODE {{ user_id }} ANALYSIS</h1>
+            <a href="/dashboard" class="back-btn">← BACK TO CONSOLE</a>
+            <h1>NODE {{ uid }} LOGS</h1>
         </header>
 
-        <div class="timeline">
-            {% for event in data.history | reverse %}
-            <div class="log-entry">
-                <div class="img-wrap" onclick="openOverlay(this.querySelector('img').src)">
-                    <img src="/screenshots/{{ event.filename }}" class="log-img">
+        <div class="history-grid">
+            <div class="main-view">
+                {% if last_img %}
+                <div class="screenshot-large">
+                    <img src="/screenshots/{{ last_img }}" alt="Latest View">
                 </div>
-                <div class="log-details">
-                    <div class="ts">{{ event.timestamp }}</div>
-                    <div class="result-box">
-                        <div class="label">Detected Answer</div>
-                        <div class="ans">{{ "ABCD"[event.answer-1] if event.answer > 0 else "?" }}</div>
-                    </div>
-                    <div class="reason">{{ event.reasoning }}</div>
-                </div>
+                {% endif %}
             </div>
-            {% endfor %}
+
+            <div class="timeline">
+                <h2 style="font-size: 1rem; margin-top: 0; margin-bottom: 20px; opacity: 0.5;">TRANSMISSION HISTORY</h2>
+                {% for entry in history|reverse %}
+                <div class="event-card {{ 'active' if loop.first else '' }}">
+                    <div class="event-time">{{ entry.time }}</div>
+                    <div class="event-answer">KEY: {{ entry.answer if entry.answer > 0 else "N/A" }}</div>
+                    <div class="event-reasoning">{{ entry.reasoning }}</div>
+                </div>
+                {% endfor %}
+            </div>
         </div>
     </div>
-
-    <div id="overlay" onclick="this.style.display='none'">
-        <img id="overlay-img" src="">
-    </div>
-
-    <script>
-        function openOverlay(src) {
-            document.getElementById('overlay-img').src = src;
-            document.getElementById('overlay').style.display = 'flex';
-        }
-    </script>
 </body>
 
 </html>
