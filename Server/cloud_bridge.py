@@ -77,7 +77,10 @@ def poll():
         return "Missing user_id", 400
     
     # Record activity
-    heartbeats[user_id] = time.time()
+    uid = str(user_id)
+    heartbeats[uid] = time.time()
+    if uid in user_data:
+        user_data[uid]["last_seen"] = time.strftime("%H:%M:%S")
     
     data = answer_queue.get(user_id, {"count": 0, "cmd_id": 0})
     count = data.get("count", 0)
@@ -199,21 +202,21 @@ def dashboard():
     all_users = {}
     for i in range(1, 16):
         uid = str(i)
-        data = user_data.get(uid, {"history": [], "last_seen": "Never", "last_img": None}).copy()
+        # Get base data
+        base_data = user_data.get(uid, {"history": [], "last_seen": "Never", "last_img": None})
+        data = base_data.copy()
         
-        # Calculate ESP online status (active in last 7 seconds)
+        # Calculate ESP online status (active in last 20 seconds)
         last_poll = heartbeats.get(uid, 0)
-        data["esp_online"] = (now - last_poll) < 7
+        data["esp_online"] = (now - last_poll) < 20
         all_users[uid] = data
         
     return render_template("dashboard.html", users=all_users)
 
 @app.route("/user/<user_id>")
 def user_history(user_id):
-    data = user_data.get(user_id)
-    if not data:
-        return "User not found", 404
-    return render_template("user_history.html", user_id=user_id, data=data)
+    data = user_data.get(user_id, {"history": [], "last_seen": "Never", "last_img": None})
+    return render_template("user_history.html", uid=user_id, history=data["history"], last_img=data.get("last_img"))
 
 @app.route("/screenshots/<path:filename>")
 def serve_screenshot(filename):

@@ -145,7 +145,7 @@
                 {% for entry in history|reverse %}
                 <div class="log-item {{ 'latest' if loop.first else '' }}">
                     <div class="log-header">
-                        <span>{{ entry.time }}</span>
+                        <span>{{ entry.timestamp }}</span>
                         <span>ID: {{ loop.index0 }}</span>
                     </div>
                     <div class="log-answer">RESULT: {{ entry.answer if entry.answer > 0 else "N/A" }}</div>
