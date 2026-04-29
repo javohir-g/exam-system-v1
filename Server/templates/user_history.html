@@ -4,16 +4,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Node {{ uid }} History | System</title>
+    <title>Node {{ uid }} History | Chat</title>
     <style>
         :root {
             --bg: #111111;
-            --card-bg: #1a1a1a;
             --border: #333333;
             --text: #eeeeee;
             --text-muted: #888888;
             --accent: #2563eb;
-            --header-bg: #1a1a1a;
+            --agent-bubble: #1a1a1a;
+            --ai-bubble: #222222;
         }
 
         body {
@@ -25,9 +25,18 @@
         }
 
         header {
-            background-color: var(--header-bg);
+            background-color: #1a1a1a;
             border-bottom: 1px solid var(--border);
             padding: 15px 30px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-left {
             display: flex;
             align-items: center;
             gap: 20px;
@@ -35,7 +44,7 @@
 
         header h1 {
             margin: 0;
-            font-size: 1.1rem;
+            font-size: 1rem;
             font-weight: 600;
         }
 
@@ -49,79 +58,102 @@
             border-radius: 2px;
         }
 
-        .back-link:hover {
-            color: #fff;
-            border-color: #555;
-        }
-
-        .container {
-            padding: 30px;
-            max-width: 1200px;
+        .chat-container {
+            max-width: 1000px;
             margin: 0 auto;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 40px;
         }
 
-        .history-layout {
-            display: grid;
-            grid-template-columns: 1fr 350px;
-            gap: 30px;
+        .message-group {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
         }
 
-        .large-preview {
-            background-color: #000;
+        /* Agent (Right) */
+        .msg-agent {
+            align-self: flex-end;
+            max-width: 60%;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+        }
+
+        .screenshot-bubble {
+            background-color: var(--agent-bubble);
             border: 1px solid var(--border);
-            border-radius: 4px;
+            border-radius: 8px 8px 0 8px;
+            padding: 5px;
             overflow: hidden;
             width: 100%;
         }
 
-        .large-preview img {
+        .screenshot-bubble img {
             width: 100%;
+            display: block;
+            border-radius: 4px;
+        }
+
+        /* AI (Left) */
+        .msg-ai {
+            align-self: flex-start;
+            max-width: 75%;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .ai-bubble {
+            background-color: var(--ai-bubble);
+            border: 1px solid var(--border);
+            border-radius: 8px 8px 8px 0;
+            padding: 15px;
+            border-left: 3px solid var(--accent);
+        }
+
+        .msg-meta {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            font-family: monospace;
+            margin-bottom: 4px;
+        }
+
+        .ai-answer {
+            font-weight: 700;
+            color: var(--accent);
+            font-size: 1.1rem;
+            margin-bottom: 8px;
             display: block;
         }
 
-        .timeline {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-
-        .log-item {
-            background-color: var(--card-bg);
-            border: 1px solid var(--border);
-            border-left: 3px solid var(--border);
-            padding: 15px;
-            border-radius: 2px;
-        }
-
-        .log-item.latest {
-            border-left-color: var(--accent);
-        }
-
-        .log-header {
-            display: flex;
-            justify-content: space-between;
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            margin-bottom: 8px;
-            font-family: monospace;
-        }
-
-        .log-answer {
-            font-weight: 700;
-            color: var(--accent);
-            font-size: 1rem;
-            margin-bottom: 5px;
-        }
-
-        .log-reasoning {
+        .ai-reasoning {
             font-size: 0.85rem;
             color: var(--text-muted);
             line-height: 1.5;
+            margin: 0;
         }
 
-        @media (max-width: 900px) {
-            .history-layout {
-                grid-template-columns: 1fr;
+        .chat-end {
+            text-align: center;
+            padding: 40px 0;
+            color: #333;
+            font-size: 0.7rem;
+            font-weight: 800;
+            letter-spacing: 2px;
+        }
+
+        @media (max-width: 768px) {
+
+            .msg-agent,
+            .msg-ai {
+                max-width: 90%;
+            }
+
+            .chat-container {
+                padding: 15px;
             }
         }
     </style>
@@ -129,31 +161,41 @@
 
 <body>
     <header>
-        <a href="/dashboard" class="back-link">CONSOLE</a>
-        <h1>NODE {{ uid }} HISTORY</h1>
+        <div class="header-left">
+            <a href="/dashboard" class="back-link">CONSOLE</a>
+            <h1>NODE {{ uid }} | LIVE TRANSMISSION</h1>
+        </div>
+        <div class="msg-meta">ENCRYPTED STREAM</div>
     </header>
-    <div class="container">
-        <div class="history-layout">
-            <div class="main-content">
-                {% if last_img %}
-                <div class="large-preview">
-                    <img src="/screenshots/{{ last_img }}" alt="Latest View">
+
+    <div class="chat-container">
+        {% for entry in history %}
+        <div class="message-group">
+            <!-- AGENT MESSAGE (Outgoing) -->
+            <div class="msg-agent">
+                <div class="msg-meta">{{ entry.timestamp }} | AGENT UPLOAD</div>
+                <div class="screenshot-bubble">
+                    <img src="/screenshots/{{ entry.filename }}" alt="Agent Screenshot">
                 </div>
-                {% endif %}
             </div>
-            <div class="timeline">
-                {% for entry in history|reverse %}
-                <div class="log-item {{ 'latest' if loop.first else '' }}">
-                    <div class="log-header">
-                        <span>{{ entry.timestamp }}</span>
-                        <span>ID: {{ loop.index0 }}</span>
-                    </div>
-                    <div class="log-answer">RESULT: {{ entry.answer if entry.answer > 0 else "N/A" }}</div>
-                    <div class="log-reasoning">{{ entry.reasoning }}</div>
+
+            <!-- AI MESSAGE (Incoming) -->
+            <div class="msg-ai">
+                <div class="msg-meta">SECURE AI RESPONSE</div>
+                <div class="ai-bubble">
+                    <span class="ai-answer">RECOMMENDED KEY: {{ entry.answer if entry.answer > 0 else "UNDEFINED"
+                        }}</span>
+                    <p class="ai-reasoning">{{ entry.reasoning }}</p>
                 </div>
-                {% endfor %}
             </div>
         </div>
+        {% endfor %}
+
+        {% if not history %}
+        <div class="chat-end">NO DATA RECEIVED FOR THIS NODE</div>
+        {% else %}
+        <div class="chat-end">END OF SECURE LOGS</div>
+        {% endif %}
     </div>
 </body>
 
