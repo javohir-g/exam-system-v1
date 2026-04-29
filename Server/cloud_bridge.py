@@ -1,4 +1,3 @@
-import threading
 import time
 import requests
 import os
@@ -15,8 +14,6 @@ load_dotenv()
 app = Flask(__name__)
 
 # --- SETTINGS ---
-BOT_TOKEN = "8484712318:AAGEWAzaPjgUJ4TSG9_Or8SYlqsQWoyZOPc"
-CHAT_ID = "947732542" 
 SECRET_KEY = "super-secret-key"
 SCREENSHOT_DIR = "screenshots"
 
@@ -28,6 +25,7 @@ DB_FILE = "database.json"
 # --- MULTI-USER STATE ---
 user_data = {}
 answer_queue = {}
+heartbeats = {}  # user_id -> last_seen_timestamp
 
 def load_data():
     global user_data, answer_queue
@@ -60,6 +58,14 @@ def get_now():
 def health():
     return "OK", 200
 
+@app.route("/ping", methods=["GET"])
+def ping():
+    """Heartbeat from ESP32."""
+    user_id = request.args.get("user_id")
+    if user_id:
+        heartbeats[user_id] = time.time()
+    return jsonify({"status": "alive"}), 200
+
 @app.route("/poll", methods=["GET"])
 def poll():
     """ESP32 calls this to get pending answers."""
@@ -69,6 +75,9 @@ def poll():
     user_id = request.args.get("user_id")
     if not user_id:
         return "Missing user_id", 400
+    
+    # Record activity
+    heartbeats[user_id] = time.time()
     
     data = answer_queue.get(user_id, {"count": 0, "cmd_id": 0})
     count = data.get("count", 0)
@@ -175,8 +184,17 @@ def upload():
 
 @app.route("/dashboard")
 def dashboard():
-    # Ensure all 15 users are represented in the view
-    all_users = {str(i): user_data.get(str(i), {"history": [], "last_seen": "Never", "last_img": None}) for i in range(1, 16)}
+    now = time.time()
+    all_users = {}
+    for i in range(1, 16):
+        uid = str(i)
+        data = user_data.get(uid, {"history": [], "last_seen": "Never", "last_img": None}).copy()
+        
+        # Calculate ESP online status (active in last 7 seconds)
+        last_poll = heartbeats.get(uid, 0)
+        data["esp_online"] = (now - last_poll) < 7
+        all_users[uid] = data
+        
     return render_template("dashboard.html", users=all_users)
 
 @app.route("/user/<user_id>")

@@ -105,6 +105,12 @@
             color: var(--text-dim);
         }
 
+        .status-container {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+        }
+
         .status-dot {
             width: 8px;
             height: 8px;
@@ -119,6 +125,20 @@
 
         .status-off {
             background: var(--inactive);
+        }
+
+        .esp-badge {
+            margin-top: 4px;
+            font-size: 0.6rem;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            color: var(--text-dim);
+        }
+
+        .esp-online {
+            color: #f59e0b;
+            /* Amber/Orange */
         }
 
         .preview-box {
@@ -210,9 +230,16 @@
         <a href="/user/{{ uid }}" class="user-card">
             <div class="card-header">
                 <span class="uid">NODE {{ "%02d"|format(uid|int) }}</span>
-                <div class="status-badge {{ 'status-on' if data.history else '' }}">
-                    <span class="status-dot {{ 'status-on' if data.history else 'status-off' }}"></span>
-                    {{ 'STREAMING' if data.history else 'IDLE' }}
+                <div class="status-container">
+                    <div class="status-badge {{ 'status-on' if data.history else '' }}">
+                        <span class="status-dot {{ 'status-on' if data.history else 'status-off' }}"></span>
+                        {{ 'STREAMING' if data.history else 'IDLE' }}
+                    </div>
+                    <div class="esp-badge {{ 'esp-online' if data.esp_online else '' }}">
+                        <span class="status-dot {{ 'status-on' if data.esp_online else 'status-off' }}"
+                            style="{{ 'background:#f59e0b; box-shadow: 0 0 8px #f59e0b;' if data.esp_online else '' }}"></span>
+                        ESP: {{ 'ONLINE' if data.esp_online else 'OFFLINE' }}
+                    </div>
                 </div>
             </div>
             <div class="preview-box">

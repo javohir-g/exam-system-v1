@@ -1,13 +1,21 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include <WiFiClientSecure.h>
+#include <WiFiMulti.h>
 
 // --- CONFIGURATION ---
-const char* ssid = "HomeWifi";
-const char* password = "11223344";
+// --- WIFI NETWORKS ---
+WiFiMulti wifiMulti;
+// Add as many networks as you want here
+void setupWiFi() {
+  wifiMulti.addAP("HomeWifi", "11223344");
+  wifiMulti.addAP("Android",   "11223344");
+  wifiMulti.addAP("#Turin.uz",  "Turin_2024@!");
+}
 
 // Use the Render Cloud URL
-const char* serverUrl = "https://exam-system-v1.onrender.com/poll";
+const char* pollUrl   = "https://exam-system-v1.onrender.com/poll";
+const char* reportUrl = "https://exam-system-v1.onrender.com/esp_report";
 const char* secretKey = "super-secret-key";
 
 // Change this ID for each device (1-15)
@@ -24,15 +32,15 @@ void setup() {
   pinMode(MOTOR_PIN, OUTPUT);
   digitalWrite(MOTOR_PIN, LOW);
 
-  WiFi.begin(ssid, password);
+  WiFi.mode(WIFI_STA);
+  setupWiFi();
+
   Serial.print("Connecting to WiFi");
-  while (WiFi.status() != WL_CONNECTED) {
+  while (wifiMulti.run() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
   }
-  Serial.println("\nWiFi connected");
-  Serial.print("IP: ");
-  Serial.println(WiFi.localIP());
+  Serial.println("\nWiFi connected. IP: " + WiFi.localIP().toString());
 }
 
 void vibrate(int times) {
@@ -48,52 +56,71 @@ void vibrate(int times) {
   Serial.println("--- VIBRATION DONE ---");
 }
 
+void sendDebugReport(int count, long cmdId, String action) {
+  if (wifiMulti.run() == WL_CONNECTED) {
+    WiFiClientSecure *client = new WiFiClientSecure;
+    if(client) {
+      client->setInsecure();
+      HTTPClient http;
+      http.begin(*client, reportUrl);
+      http.addHeader("Content-Type", "json");
+      http.addHeader("X-Secret", secretKey);
+
+      StaticJsonDocument<200> doc;
+      doc["user_id"] = USER_ID;
+      doc["rssi"] = WiFi.RSSI();
+      doc["free_heap"] = ESP.getFreeHeap();
+      doc["count"] = count;
+      doc["cmd_id"] = cmdId;
+      doc["action"] = action;
+      doc["motor_pin"] = MOTOR_PIN;
+
+      String requestBody;
+      serializeJson(doc, requestBody);
+      int httpCode = http.POST(requestBody);
+      http.end();
+      delete client;
+    }
+  }
+}
+
 void loop() {
-  if (WiFi.status() == WL_CONNECTED) {
+  if (wifiMulti.run() == WL_CONNECTED) {
     WiFiClientSecure *client = new WiFiClientSecure;
     if(client) {
       client->setInsecure(); // Skip SSL certificate verification
       HTTPClient http;
-      String url = String(serverUrl) + "?user_id=" + String(USER_ID);
+      String url = String(pollUrl) + "?user_id=" + String(USER_ID);
       http.begin(*client, url);
       http.addHeader("X-Secret", secretKey);
       http.setTimeout(5000); // 5 sec timeout
 
       int httpCode = http.GET();
-    if (httpCode == 200) {
-      String payload = http.getString();
-      StaticJsonDocument<200> doc;
-      DeserializationError error = deserializeJson(doc, payload);
+      if (httpCode == 200) {
+        String payload = http.getString();
+        StaticJsonDocument<200> doc;
+        DeserializationError error = deserializeJson(doc, payload);
 
-      if (!error) {
-        int count = doc["count"];
-        long cmdId = doc["cmd_id"];
+        if (!error) {
+          int count = doc["count"];
+          long cmdId = doc["cmd_id"];
 
-        // Only vibrate if count > 0 AND this is a NEW command ID
-        if (count > 0 && cmdId != lastCommandId) {
-          Serial.print("New Command Received! ID: ");
-          Serial.print(cmdId);
-          Serial.print(", Pulses: ");
-          Serial.println(count);
-          
-          lastCommandId = cmdId; // Update last processed ID
-          vibrate(count);
-          
-          Serial.println("Waiting 5s before next poll to ensure stability...");
-          delay(5000); // Extra safety delay after vibration
-        } else if (count > 0 && cmdId == lastCommandId) {
-          Serial.println("Command already processed. Skipping.");
+          if (count > 0 && cmdId != lastCommandId) {
+            lastCommandId = cmdId;
+            sendDebugReport(count, cmdId, "vibrating");
+            vibrate(count);
+            sendDebugReport(0, cmdId, "idle");
+            delay(5000);
+          } else {
+            sendDebugReport(0, lastCommandId, "idle");
+          }
         }
-      } else {
-        Serial.print("JSON Parse Error: ");
-        Serial.println(error.c_str());
       }
       http.end();
       delete client;
     }
   } else {
-    Serial.println("WiFi Disconnected. Reconnecting...");
-    WiFi.begin(ssid, password);
+    Serial.println("WiFi Disconnected. Waiting for reconnection...");
   }
   
   delay(3000); // Regular poll delay
