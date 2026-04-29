@@ -137,11 +137,22 @@ def upload():
                     "messages": [{
                         "role": "user",
                         "content": [
-                            {"type": "text", "text": "Analyze this exam screenshot. Find the correct answer. Respond ONLY with raw JSON: {\"reasoning\": \"...\", \"answer\": <1|2|3|4>}. 1=A, 2=B, 3=C, 4=D."},
+                            {
+                                "type": "text", 
+                                "text": (
+                                    "You are an expert Professor. Analyze this exam screenshot and find the correct answer.\n\n"
+                                    "INSTRUCTIONS:\n"
+                                    "1. Identify the question and ALL available options.\n"
+                                    "2. In the 'reasoning' field, briefly explain your logic in Russian.\n"
+                                    "3. In the 'answer' field, provide the integer index of the correct option: 1=A, 2=B, 3=C, 4=D, 5=E, 6=F, and so on.\n"
+                                    "4. If no clear answer is found, return 0.\n\n"
+                                    "Respond ONLY with raw JSON: {\"reasoning\": \"...\", \"answer\": <int>}"
+                                )
+                            },
                             {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
                         ]
                     }],
-                    "max_tokens": 150
+                    "max_tokens": 300
                 }
                 
                 res = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload, timeout=30)
