@@ -4,145 +4,123 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Node {{ uid }} History</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <title>Node {{ uid }} History | System</title>
     <style>
         :root {
-            --bg: #030303;
-            --surface: rgba(15, 15, 18, 0.6);
-            --border: rgba(255, 255, 255, 0.08);
-            --accent: #00f2ff;
-            --text-main: #fcfcfc;
-            --text-dim: #94a3b8;
+            --bg: #111111;
+            --card-bg: #1a1a1a;
+            --border: #333333;
+            --text: #eeeeee;
+            --text-muted: #888888;
+            --accent: #2563eb;
+            --header-bg: #1a1a1a;
         }
 
         body {
-            background: var(--bg);
-            background-image: radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.08) 0%, transparent 50%);
-            color: var(--text-main);
-            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             margin: 0;
-            padding: 30px;
-            min-height: 100vh;
-            -webkit-font-smoothing: antialiased;
+            padding: 0;
+        }
+
+        header {
+            background-color: var(--header-bg);
+            border-bottom: 1px solid var(--border);
+            padding: 15px 30px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .back-link {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.8rem;
+            font-weight: 700;
+            border: 1px solid var(--border);
+            padding: 4px 10px;
+            border-radius: 2px;
+        }
+
+        .back-link:hover {
+            color: #fff;
+            border-color: #555;
         }
 
         .container {
+            padding: 30px;
             max-width: 1200px;
             margin: 0 auto;
         }
 
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 40px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .back-btn {
-            color: var(--text-dim);
-            text-decoration: none;
-            font-size: 0.9rem;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            transition: color 0.2s;
-        }
-
-        .back-btn:hover {
-            color: var(--accent);
-        }
-
-        h1 {
-            font-size: 1.5rem;
-            font-weight: 700;
-            margin: 0;
-        }
-
-        .history-grid {
+        .history-layout {
             display: grid;
-            grid-template-columns: 2fr 1fr;
+            grid-template-columns: 1fr 350px;
             gap: 30px;
         }
 
-        .main-view {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-
-        .screenshot-large {
-            width: 100%;
-            border-radius: 20px;
+        .large-preview {
+            background-color: #000;
             border: 1px solid var(--border);
+            border-radius: 4px;
             overflow: hidden;
-            background: #000;
-            position: relative;
+            width: 100%;
         }
 
-        .screenshot-large img {
+        .large-preview img {
             width: 100%;
             display: block;
         }
 
         .timeline {
-            background: var(--surface);
-            backdrop-filter: blur(12px);
-            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .log-item {
+            background-color: var(--card-bg);
             border: 1px solid var(--border);
-            padding: 20px;
-            height: fit-content;
-            max-height: 80vh;
-            overflow-y: auto;
+            border-left: 3px solid var(--border);
+            padding: 15px;
+            border-radius: 2px;
         }
 
-        .event-card {
-            border-left: 2px solid var(--border);
-            padding-left: 20px;
-            margin-bottom: 25px;
-            position: relative;
+        .log-item.latest {
+            border-left-color: var(--accent);
         }
 
-        .event-card::before {
-            content: '';
-            position: absolute;
-            left: -5px;
-            top: 0;
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: var(--border);
-        }
-
-        .event-card.active::before {
-            background: var(--accent);
-            box-shadow: 0 0 10px var(--accent);
-        }
-
-        .event-time {
+        .log-header {
+            display: flex;
+            justify-content: space-between;
             font-size: 0.75rem;
-            color: var(--text-dim);
-            margin-bottom: 5px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
             font-family: monospace;
         }
 
-        .event-answer {
+        .log-answer {
             font-weight: 700;
             color: var(--accent);
-            font-size: 1.1rem;
+            font-size: 1rem;
+            margin-bottom: 5px;
         }
 
-        .event-reasoning {
+        .log-reasoning {
             font-size: 0.85rem;
-            color: var(--text-dim);
-            margin-top: 5px;
-            line-height: 1.4;
+            color: var(--text-muted);
+            line-height: 1.5;
         }
 
         @media (max-width: 900px) {
-            .history-grid {
+            .history-layout {
                 grid-template-columns: 1fr;
             }
         }
@@ -150,28 +128,28 @@
 </head>
 
 <body>
+    <header>
+        <a href="/dashboard" class="back-link">CONSOLE</a>
+        <h1>NODE {{ uid }} HISTORY</h1>
+    </header>
     <div class="container">
-        <header>
-            <a href="/dashboard" class="back-btn">← BACK TO CONSOLE</a>
-            <h1>NODE {{ uid }} LOGS</h1>
-        </header>
-
-        <div class="history-grid">
-            <div class="main-view">
+        <div class="history-layout">
+            <div class="main-content">
                 {% if last_img %}
-                <div class="screenshot-large">
+                <div class="large-preview">
                     <img src="/screenshots/{{ last_img }}" alt="Latest View">
                 </div>
                 {% endif %}
             </div>
-
             <div class="timeline">
-                <h2 style="font-size: 1rem; margin-top: 0; margin-bottom: 20px; opacity: 0.5;">TRANSMISSION HISTORY</h2>
                 {% for entry in history|reverse %}
-                <div class="event-card {{ 'active' if loop.first else '' }}">
-                    <div class="event-time">{{ entry.time }}</div>
-                    <div class="event-answer">KEY: {{ entry.answer if entry.answer > 0 else "N/A" }}</div>
-                    <div class="event-reasoning">{{ entry.reasoning }}</div>
+                <div class="log-item {{ 'latest' if loop.first else '' }}">
+                    <div class="log-header">
+                        <span>{{ entry.time }}</span>
+                        <span>ID: {{ loop.index0 }}</span>
+                    </div>
+                    <div class="log-answer">RESULT: {{ entry.answer if entry.answer > 0 else "N/A" }}</div>
+                    <div class="log-reasoning">{{ entry.reasoning }}</div>
                 </div>
                 {% endfor %}
             </div>
