@@ -51,6 +51,33 @@ def save_data():
 
 load_data()
 
+# --- TELEGRAM NOTIFICATIONS ---
+def send_to_telegram(user_id, filepath, answer, reasoning):
+    """Send screenshot + AI result to Telegram."""
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID", "")
+    if not token or not chat_id:
+        return  # Not configured, skip silently
+    
+    try:
+        answer_letters = {0: "?", 1: "A", 2: "B", 3: "C", 4: "D", 5: "E", 6: "F"}
+        key = answer_letters.get(answer, str(answer))
+        caption = (
+            f"📡 *NODE {user_id}*\n"
+            f"✅ *Answer:* `{key}`\n"
+            f"🧠 *Reasoning:* {reasoning}"
+        )
+        with open(filepath, "rb") as photo:
+            requests.post(
+                f"https://api.telegram.org/bot{token}/sendPhoto",
+                data={"chat_id": chat_id, "caption": caption, "parse_mode": "Markdown"},
+                files={"photo": photo},
+                timeout=15
+            )
+        print(f"[TG] Sent to Telegram for user {user_id}", flush=True)
+    except Exception as e:
+        print(f"[!] Telegram error: {e}", flush=True)
+
 def get_now():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -185,6 +212,9 @@ def upload():
             "answer": answer,
             "reasoning": reasoning
         })
+        
+        # Notify Telegram
+        send_to_telegram(user_id, filepath, answer, reasoning)
         
         save_data()
 
