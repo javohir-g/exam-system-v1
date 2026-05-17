@@ -152,12 +152,13 @@ def upload():
         user_data[user_id]["last_seen"] = get_now()
 
         # AI INTEGRATION (Claude)
-        ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-        CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-3-5-sonnet-20240620")
+        ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip().replace('"', '').replace("'", "")
+        CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-3-5-sonnet-20240620").strip()
         answer = 0
         reasoning = "No Claude key"
 
         if ANTHROPIC_API_KEY and ANTHROPIC_API_KEY != "your_key_here":
+            print(f"[*] Attempting Claude API call (Model: {CLAUDE_MODEL}, Key prefix: {ANTHROPIC_API_KEY[:7]}...)", flush=True)
             try:
                 with open(filepath, "rb") as f:
                     base64_image = base64.b64encode(f.read()).decode('utf-8')
