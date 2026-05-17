@@ -227,12 +227,18 @@ def process_batch(user_id, filepaths, ts):
 
             if task_type == "drag":
                 matches = parsed.get("matches", [])
-                for i, m in enumerate(matches):
+                # Sort matches by target slot (d) to ensure 1, 2, 3... order
+                sorted_matches = sorted(matches, key=lambda x: x.get('d', 0))
+                
+                for i, m in enumerate(sorted_matches):
                     user_queue.append({"count": m.get("s", 0), "count2": m.get("d", 0), "cmd_id": ts + i})
                 
-                # Format for Telegram: "1→3 | 2→2"
-                tg_answer = " | ".join([f"{m.get('s')}→{m.get('d')}" for m in matches])
-                answer_val = matches[0].get("s", 0) if matches else 0
+                # Format for Telegram: 
+                # 1) 1
+                # 2) 3
+                # 3) 2
+                tg_answer = "\n".join([f"{m.get('d')}) {m.get('s')}" for m in sorted_matches])
+                answer_val = sorted_matches[0].get("s", 0) if sorted_matches else 0
             else:
                 answer_val = parsed.get("answer", 0)
                 user_queue.append({"count": answer_val, "count2": 0, "cmd_id": ts})
