@@ -151,24 +151,38 @@ def upload():
         user_data[user_id]["last_img"] = filename
         user_data[user_id]["last_seen"] = get_now()
 
-        # AI INTEGRATION
-        OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+        # AI INTEGRATION (Claude 3.5 Sonnet)
+        ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
         answer = 0
-        reasoning = "No AI key"
+        reasoning = "No Claude key"
 
-        if OPENAI_API_KEY:
+        if ANTHROPIC_API_KEY:
             try:
                 with open(filepath, "rb") as f:
                     base64_image = base64.b64encode(f.read()).decode('utf-8')
                 
-                headers = {"Content-Type": "application/json", "Authorization": f"Bearer {OPENAI_API_KEY}"}
+                headers = {
+                    "x-api-key": ANTHROPIC_API_KEY,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json"
+                }
+
                 payload = {
-                    "model": "gpt-4o",
+                    "model": "claude-3-5-sonnet-20240620",
+                    "max_tokens": 512,
                     "messages": [{
                         "role": "user",
                         "content": [
                             {
-                                "type": "text", 
+                                "type": "image",
+                                "source": {
+                                    "type": "base64",
+                                    "media_type": "image/jpeg",
+                                    "data": base64_image
+                                }
+                            },
+                            {
+                                "type": "text",
                                 "text": (
                                     "You are an expert Professor. Analyze this exam screenshot and find the correct answer.\n\n"
                                     "INSTRUCTIONS:\n"
@@ -178,28 +192,31 @@ def upload():
                                     "4. If no clear answer is found, return 0.\n\n"
                                     "Respond ONLY with raw JSON: {\"reasoning\": \"...\", \"answer\": <int>}"
                                 )
-                            },
-                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
+                            }
                         ]
-                    }],
-                    "max_tokens": 300
+                    }]
                 }
                 
-                res = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload, timeout=30)
+                res = requests.post("https://api.anthropic.com/v1/messages", headers=headers, json=payload, timeout=30)
                 res_data = res.json()
-                content = res_data['choices'][0]['message']['content'].strip()
                 
-                if "```" in content:
-                    content = content.split("```")[1]
-                    if content.startswith("json"): content = content[4:]
+                if 'content' in res_data:
+                    content = res_data['content'][0]['text'].strip()
+                    
+                    if "```" in content:
+                        content = content.split("```")[1]
+                        if content.startswith("json"): content = content[4:]
 
-                parsed = json.loads(content.strip())
-                answer = parsed.get("answer", 0)
-                reasoning = parsed.get("reasoning", "Parsed OK")
-                
-                # Queue for ESP32 with unique command ID
-                answer_queue[user_id] = {"count": answer, "cmd_id": ts}
-                print(f"[AI] User {user_id} -> Answer {answer} (CMD_ID: {ts})", flush=True)
+                    parsed = json.loads(content.strip())
+                    answer = parsed.get("answer", 0)
+                    reasoning = parsed.get("reasoning", "Parsed OK")
+                    
+                    # Queue for ESP32 with unique command ID
+                    answer_queue[user_id] = {"count": answer, "cmd_id": ts}
+                    print(f"[Claude] User {user_id} -> Answer {answer} (CMD_ID: {ts})", flush=True)
+                else:
+                    print(f"[!] Claude Error: {res_data}", flush=True)
+                    reasoning = f"Claude API Error: {res_data.get('error', {}).get('message', 'Unknown')}"
 
             except Exception as ai_e:
                 print(f"[!] AI Error: {ai_e}", flush=True)
