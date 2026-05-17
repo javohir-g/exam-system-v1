@@ -151,28 +151,24 @@ def upload():
         user_data[user_id]["last_img"] = filename
         user_data[user_id]["last_seen"] = get_now()
 
-        # AI INTEGRATION (Claude)
+        # AI INTEGRATION (Claude via official SDK)
         ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip().replace('"', '').replace("'", "")
-        CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-3-5-sonnet-20240620").strip()
+        CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-3-5-sonnet-20241022").strip()
         answer = 0
         reasoning = "No Claude key"
 
         if ANTHROPIC_API_KEY and ANTHROPIC_API_KEY != "your_key_here":
-            print(f"[*] Attempting Claude API call (Model: {CLAUDE_MODEL}, Key prefix: {ANTHROPIC_API_KEY[:7]}...)", flush=True)
+            print(f"[*] Attempting Claude call (Model: {CLAUDE_MODEL}, Key: {ANTHROPIC_API_KEY[:12]}...)", flush=True)
             try:
+                import anthropic as anthropic_sdk
                 with open(filepath, "rb") as f:
                     base64_image = base64.b64encode(f.read()).decode('utf-8')
-                
-                headers = {
-                    "x-api-key": ANTHROPIC_API_KEY,
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json"
-                }
 
-                payload = {
-                    "model": CLAUDE_MODEL,
-                    "max_tokens": 512,
-                    "messages": [{
+                client = anthropic_sdk.Anthropic(api_key=ANTHROPIC_API_KEY)
+                message = client.messages.create(
+                    model=CLAUDE_MODEL,
+                    max_tokens=512,
+                    messages=[{
                         "role": "user",
                         "content": [
                             {
@@ -197,40 +193,30 @@ def upload():
                             }
                         ]
                     }]
-                }
-                
-                res = requests.post("https://api.anthropic.com/v1/messages", headers=headers, json=payload, timeout=30)
-                res_data = res.json()
-                
-                if 'content' in res_data:
-                    content = res_data['content'][0]['text'].strip()
-                    
-                    if "```" in content:
-                        content = content.split("```")[1]
-                        if content.startswith("json"): content = content[4:]
+                )
 
-                    parsed = json.loads(content.strip())
-                    answer = parsed.get("answer", 0)
-                    reasoning = parsed.get("reasoning", "Parsed OK")
-                    
-                    # Queue for ESP32 with unique command ID
-                    answer_queue[user_id] = {"count": answer, "cmd_id": ts}
-                    print(f"[Claude] User {user_id} -> Answer {answer} (CMD_ID: {ts})", flush=True)
-                else:
-                    print(f"[!] Claude Error Response: {json.dumps(res_data, indent=2)}", flush=True)
-                    err_msg = res_data.get('error', {}).get('message', 'Unknown error')
-                    reasoning = f"Claude API Error: {err_msg}"
-                    # If model not found, suggest fallback
-                    if "model" in err_msg.lower() or "not found" in err_msg.lower():
-                        reasoning += " (Try checking model availability for your API key)"
+                content = message.content[0].text.strip()
+                print(f"[Claude RAW] {content}", flush=True)
+
+                if "```" in content:
+                    content = content.split("```")[1]
+                    if content.startswith("json"):
+                        content = content[4:]
+
+                parsed = json.loads(content.strip())
+                answer = parsed.get("answer", 0)
+                reasoning = parsed.get("reasoning", "Parsed OK")
+
+                answer_queue[user_id] = {"count": answer, "cmd_id": ts}
+                print(f"[Claude] User {user_id} -> Answer {answer} (CMD_ID: {ts})", flush=True)
 
             except Exception as ai_e:
-                print(f"[!] AI Exception: {ai_e}", flush=True)
+                print(f"[!] Claude Exception: {ai_e}", flush=True)
                 traceback.print_exc()
-                reasoning = f"Server Error: {str(ai_e)}"
+                reasoning = f"Claude Error: {str(ai_e)}"
         else:
-            reasoning = "ANTHROPIC_API_KEY is not set correctly in .env"
-            print("[!] Error: ANTHROPIC_API_KEY is still using 'your_key_here'", flush=True)
+            reasoning = "ANTHROPIC_API_KEY is not set"
+            print("[!] Error: ANTHROPIC_API_KEY is missing or placeholder", flush=True)
 
         # Store in history
         user_data[user_id]["history"].append({
