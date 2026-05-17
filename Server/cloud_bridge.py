@@ -1,4 +1,5 @@
 import time
+import threading
 import requests
 import os
 import traceback
@@ -27,6 +28,10 @@ user_data = {}
 answer_queue = {}
 heartbeats = {}  # user_id -> last_seen_timestamp
 
+# --- PHOTO BUFFER (3-second server-side batching) ---
+# {user_id: {"files": [...], "timer": threading.Timer}}
+pending_uploads = {}
+
 def load_data():
     global user_data, answer_queue
     if os.path.exists(DB_FILE):
@@ -52,12 +57,12 @@ def save_data():
 load_data()
 
 # --- TELEGRAM NOTIFICATIONS ---
-def send_to_telegram(user_id, filepath, answer, reasoning):
-    """Send screenshot + AI result to Telegram."""
+def send_to_telegram(user_id, filepaths, answer, reasoning):
+    """Send screenshot(s) + AI result to Telegram. Supports media groups for multiple images."""
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
     chat_id = os.environ.get("TELEGRAM_CHAT_ID", "")
     if not token or not chat_id:
-        return  # Not configured, skip silently
+        return
     
     try:
         answer_letters = {0: "?", 1: "A", 2: "B", 3: "C", 4: "D", 5: "E", 6: "F"}
@@ -67,14 +72,41 @@ def send_to_telegram(user_id, filepath, answer, reasoning):
             f"✅ *Answer:* `{key}`\n"
             f"🧠 *Reasoning:* {reasoning}"
         )
-        with open(filepath, "rb") as photo:
+
+        if isinstance(filepaths, str):
+            filepaths = [filepaths]
+
+        if len(filepaths) == 1:
+            # Single photo
+            with open(filepaths[0], "rb") as photo:
+                requests.post(
+                    f"https://api.telegram.org/bot{token}/sendPhoto",
+                    data={"chat_id": chat_id, "caption": caption, "parse_mode": "Markdown"},
+                    files={"photo": photo},
+                    timeout=15
+                )
+        else:
+            # Multiple photos — send as media group
+            media = []
+            files = {}
+            for i, fp in enumerate(filepaths):
+                field = f"photo_{i}"
+                files[field] = open(fp, "rb")
+                item = {"type": "photo", "media": f"attach://{field}"}
+                if i == 0:
+                    item["caption"] = caption
+                    item["parse_mode"] = "Markdown"
+                media.append(item)
             requests.post(
-                f"https://api.telegram.org/bot{token}/sendPhoto",
-                data={"chat_id": chat_id, "caption": caption, "parse_mode": "Markdown"},
-                files={"photo": photo},
-                timeout=15
+                f"https://api.telegram.org/bot{token}/sendMediaGroup",
+                data={"chat_id": chat_id, "media": json.dumps(media)},
+                files=files,
+                timeout=30
             )
-        print(f"[TG] Sent to Telegram for user {user_id}", flush=True)
+            for f in files.values():
+                f.close()
+
+        print(f"[TG] Sent to Telegram for user {user_id} ({len(filepaths)} photo(s))", flush=True)
     except Exception as e:
         print(f"[!] Telegram error: {e}", flush=True)
 
@@ -121,158 +153,13 @@ def poll():
     
     return jsonify({"count": count, "count2": count2, "cmd_id": cmd_id}), 200
 
-@app.route("/upload", methods=["POST"])
-def upload():
-    user_id = request.headers.get("X-User-Id", "1")
-    print(f"[*] Received upload from User {user_id}", flush=True)
-    
-    if SECRET_KEY and request.headers.get("X-Secret") != SECRET_KEY:
-        return "Unauthorized", 401
 
-    if "file" not in request.files:
-        return "No file", 400
-    
-    file = request.files["file"]
-    if file.filename == "":
-        return "No filename", 400
-
-    # Save with timestamp and user ID
-    ts = int(time.time())
-    filename = f"user_{user_id}_{ts}.jpg"
-    filepath = os.path.join(SCREENSHOT_DIR, filename)
-    
-    try:
-        file.save(filepath)
-        
-        # Update user tracking
-        if user_id not in user_data:
-            user_data[user_id] = {"history": []}
-        
-        user_data[user_id]["last_img"] = filename
-        user_data[user_id]["last_seen"] = get_now()
-
-        # AI INTEGRATION (Claude via official SDK)
-        ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip().replace('"', '').replace("'", "")
-        CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-3-5-sonnet-20241022").strip()
-        answer = 0
-        reasoning = "No Claude key"
-
-        if ANTHROPIC_API_KEY and ANTHROPIC_API_KEY != "your_key_here":
-            print(f"[*] Attempting Claude call (Model: {CLAUDE_MODEL}, Key: {ANTHROPIC_API_KEY[:12]}...)", flush=True)
-            try:
-                import anthropic as anthropic_sdk
-                with open(filepath, "rb") as f:
-                    base64_image = base64.b64encode(f.read()).decode('utf-8')
-
-                client = anthropic_sdk.Anthropic(api_key=ANTHROPIC_API_KEY)
-                message = client.messages.create(
-                    model=CLAUDE_MODEL,
-                    max_tokens=512,
-                    messages=[{
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "image",
-                                "source": {
-                                    "type": "base64",
-                                    "media_type": "image/jpeg",
-                                    "data": base64_image
-                                }
-                            },
-                            {
-                                "type": "text",
-                                "text": (
-                                    "You are an expert Professor analyzing an exam screenshot.\n\n"
-                                    "TASK TYPE DETECTION:\n"
-                                    "- If this is a MULTIPLE CHOICE question (options A/B/C/D/E/F): return type 'choice'\n"
-                                    "- If this is a DRAG & DROP task (match, order, categorize): return type 'drag'\n\n"
-                                    "FOR CHOICE: In 'answer' put the index: 1=A, 2=B, 3=C, 4=D, 5=E, 6=F. Set 'answer2' to 0.\n"
-                                    "FOR DRAG: In 'answer' put the SOURCE item number. In 'answer2' put the DESTINATION slot number.\n"
-                                    "  Items/slots are numbered from top-to-bottom, left-to-right starting from 1.\n"
-                                    "  If multiple pairs needed, return the FIRST/MOST IMPORTANT pair.\n"
-                                    "If uncertain, return answer=0 and answer2=0.\n\n"
-                                    "In 'reasoning' briefly explain in Russian.\n\n"
-                                    "Respond ONLY with raw JSON: {\"type\": \"choice|drag\", \"reasoning\": \"...\", \"answer\": <int>, \"answer2\": <int>}"
-                                )
-                            }
-                        ]
-                    }]
-                )
-
-                content = message.content[0].text.strip()
-                print(f"[Claude RAW] {content}", flush=True)
-
-                if "```" in content:
-                    content = content.split("```")[1]
-                    if content.startswith("json"):
-                        content = content[4:]
-
-                parsed = json.loads(content.strip())
-                answer = parsed.get("answer", 0)
-                answer2 = parsed.get("answer2", 0)
-                task_type = parsed.get("type", "choice")
-                reasoning = parsed.get("reasoning", "Parsed OK")
-
-                answer_queue[user_id] = {"count": answer, "count2": answer2, "cmd_id": ts}
-                print(f"[Claude] User {user_id} -> type={task_type} answer={answer} answer2={answer2} (CMD_ID: {ts})", flush=True)
-
-            except Exception as ai_e:
-                print(f"[!] Claude Exception: {ai_e}", flush=True)
-                traceback.print_exc()
-                reasoning = f"Claude Error: {str(ai_e)}"
-        else:
-            reasoning = "ANTHROPIC_API_KEY is not set"
-            print("[!] Error: ANTHROPIC_API_KEY is missing or placeholder", flush=True)
-
-        # Store in history
-        user_data[user_id]["history"].append({
-            "timestamp": get_now(),
-            "filename": filename,
-            "answer": answer,
-            "reasoning": reasoning
-        })
-        
-        # Notify Telegram
-        send_to_telegram(user_id, filepath, answer, reasoning)
-        
-        save_data()
-
-        return jsonify({"user_id": user_id, "answer": answer}), 200
-            
-    except Exception as e:
-        traceback.print_exc()
-        return jsonify({"status": "error", "info": str(e)}), 500
-
-@app.route("/upload_batch", methods=["POST"])
-def upload_batch():
-    """Agent uploads multiple screenshots for richer AI context."""
-    user_id = request.headers.get("X-User-Id", "1")
-    if SECRET_KEY and request.headers.get("X-Secret") != SECRET_KEY:
-        return "Unauthorized", 401
-
-    ts = int(time.time())
-    filepaths = []
-    for i in range(1, 5):  # Accept up to 4 images: file_1 .. file_4
-        key = f"file_{i}"
-        if key in request.files:
-            f = request.files[key]
-            fname = f"user_{user_id}_{ts}_{i}.jpg"
-            fpath = os.path.join(SCREENSHOT_DIR, fname)
-            f.save(fpath)
-            filepaths.append(fpath)
-
-    if not filepaths:
-        return "No files", 400
-
-    print(f"[*] Batch upload from User {user_id}: {len(filepaths)} image(s)", flush=True)
-
-    if user_id not in user_data:
-        user_data[user_id] = {"history": []}
-    user_data[user_id]["last_img"] = os.path.basename(filepaths[0])
-    user_data[user_id]["last_seen"] = get_now()
+def process_batch(user_id, filepaths, ts):
+    """Called after 3s timeout: runs AI on all buffered photos and notifies."""
+    print(f"[*] Processing batch for User {user_id}: {len(filepaths)} photo(s)", flush=True)
 
     ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip().replace('"', '').replace("'", "")
-    CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-3-5-sonnet-20241022").strip()
+    CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-haiku-4-5").strip()
     answer = 0
     answer2 = 0
     reasoning = "No Claude key"
@@ -284,12 +171,20 @@ def upload_batch():
             for fpath in filepaths:
                 with open(fpath, "rb") as f:
                     b64 = base64.b64encode(f.read()).decode('utf-8')
-                content_blocks.append({"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}})
+                content_blocks.append({
+                    "type": "image",
+                    "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}
+                })
+
+            prompt_prefix = (
+                "You are an expert Professor analyzing exam screenshots "
+                f"({len(filepaths)} image(s) may show different parts of the same question).\n\n"
+            ) if len(filepaths) > 1 else "You are an expert Professor analyzing an exam screenshot.\n\n"
 
             content_blocks.append({
                 "type": "text",
                 "text": (
-                    "You are an expert Professor analyzing exam screenshots (multiple images may show different parts of the same question).\n\n"
+                    prompt_prefix +
                     "TASK TYPE DETECTION:\n"
                     "- If this is a MULTIPLE CHOICE question (options A/B/C/D/E/F): return type 'choice'\n"
                     "- If this is a DRAG & DROP task (match, order, categorize): return type 'drag'\n\n"
@@ -310,6 +205,7 @@ def upload_batch():
             )
 
             content = message.content[0].text.strip()
+            print(f"[Claude RAW] {content}", flush=True)
             if "```" in content:
                 content = content.split("```")[1]
                 if content.startswith("json"):
@@ -322,22 +218,79 @@ def upload_batch():
             reasoning = parsed.get("reasoning", "Parsed OK")
 
             answer_queue[user_id] = {"count": answer, "count2": answer2, "cmd_id": ts}
-            print(f"[Claude Batch] User {user_id} -> type={task_type} answer={answer} answer2={answer2}", flush=True)
+            print(f"[Claude] User {user_id} -> type={task_type} answer={answer} answer2={answer2} (CMD_ID: {ts})", flush=True)
 
         except Exception as ai_e:
-            print(f"[!] Batch Claude Exception: {ai_e}", flush=True)
+            print(f"[!] Claude Exception: {ai_e}", flush=True)
             traceback.print_exc()
             reasoning = f"Claude Error: {str(ai_e)}"
 
+    if user_id not in user_data:
+        user_data[user_id] = {"history": []}
     user_data[user_id]["history"].append({
         "timestamp": get_now(),
         "filename": os.path.basename(filepaths[0]),
         "answer": answer,
         "reasoning": reasoning
     })
-    send_to_telegram(user_id, filepaths[0], answer, reasoning)
+    send_to_telegram(user_id, filepaths, answer, reasoning)
     save_data()
-    return jsonify({"user_id": user_id, "answer": answer, "answer2": answer2}), 200
+
+
+@app.route("/upload", methods=["POST"])
+def upload():
+    """Receives a photo from the agent. Buffers for 3s, then processes all."""
+    user_id = request.headers.get("X-User-Id", "1")
+    print(f"[*] Received upload from User {user_id}", flush=True)
+
+    if SECRET_KEY and request.headers.get("X-Secret") != SECRET_KEY:
+        return "Unauthorized", 401
+
+    if "file" not in request.files:
+        return "No file", 400
+
+    file = request.files["file"]
+    if file.filename == "":
+        return "No filename", 400
+
+    ts = int(time.time())
+    filename = f"user_{user_id}_{ts}.jpg"
+    filepath = os.path.join(SCREENSHOT_DIR, filename)
+
+    try:
+        file.save(filepath)
+
+        if user_id not in user_data:
+            user_data[user_id] = {"history": []}
+        user_data[user_id]["last_img"] = filename
+        user_data[user_id]["last_seen"] = get_now()
+
+        # --- 3-second batch buffer ---
+        if user_id in pending_uploads and pending_uploads[user_id]["timer"] is not None:
+            pending_uploads[user_id]["timer"].cancel()  # Reset timer
+        
+        if user_id not in pending_uploads:
+            pending_uploads[user_id] = {"files": [], "timer": None}
+        
+        pending_uploads[user_id]["files"].append(filepath)
+        files_snapshot = pending_uploads[user_id]["files"]
+        batch_ts = ts
+
+        def fire():
+            batch_files = pending_uploads.pop(user_id, {}).get("files", [filepath])
+            process_batch(user_id, batch_files, batch_ts)
+
+        timer = threading.Timer(3.0, fire)
+        pending_uploads[user_id]["timer"] = timer
+        timer.start()
+        print(f"[*] Buffered photo {len(pending_uploads[user_id]['files'])} for User {user_id}, waiting 3s...", flush=True)
+        # --------------------------------
+
+        return jsonify({"user_id": user_id, "status": "buffered"}), 200
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"status": "error", "info": str(e)}), 500
 
 # --- DASHBOARD ROUTES ---
 

