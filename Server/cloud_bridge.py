@@ -231,7 +231,8 @@ def process_batch(user_id, filepaths, ts):
                 sorted_matches = sorted(matches, key=lambda x: x.get('d', 0))
                 
                 for i, m in enumerate(sorted_matches):
-                    user_queue.append({"count": m.get("s", 0), "count2": m.get("d", 0), "cmd_id": ts + i})
+                    # Set count2=0 so ESP32 only vibrates the button number (count)
+                    user_queue.append({"count": m.get("s", 0), "count2": 0, "cmd_id": ts + i})
                 
                 # Format for Telegram: 
                 # 1) 1
