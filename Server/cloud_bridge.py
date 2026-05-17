@@ -156,7 +156,7 @@ def upload():
         answer = 0
         reasoning = "No Claude key"
 
-        if ANTHROPIC_API_KEY:
+        if ANTHROPIC_API_KEY and ANTHROPIC_API_KEY != "your_key_here":
             try:
                 with open(filepath, "rb") as f:
                     base64_image = base64.b64encode(f.read()).decode('utf-8')
@@ -215,12 +215,20 @@ def upload():
                     answer_queue[user_id] = {"count": answer, "cmd_id": ts}
                     print(f"[Claude] User {user_id} -> Answer {answer} (CMD_ID: {ts})", flush=True)
                 else:
-                    print(f"[!] Claude Error: {res_data}", flush=True)
-                    reasoning = f"Claude API Error: {res_data.get('error', {}).get('message', 'Unknown')}"
+                    print(f"[!] Claude Error Response: {json.dumps(res_data, indent=2)}", flush=True)
+                    err_msg = res_data.get('error', {}).get('message', 'Unknown error')
+                    reasoning = f"Claude API Error: {err_msg}"
+                    # If model not found, suggest fallback
+                    if "model" in err_msg.lower() or "not found" in err_msg.lower():
+                        reasoning += " (Try checking model availability for your API key)"
 
             except Exception as ai_e:
-                print(f"[!] AI Error: {ai_e}", flush=True)
-                reasoning = str(ai_e)
+                print(f"[!] AI Exception: {ai_e}", flush=True)
+                traceback.print_exc()
+                reasoning = f"Server Error: {str(ai_e)}"
+        else:
+            reasoning = "ANTHROPIC_API_KEY is not set correctly in .env"
+            print("[!] Error: ANTHROPIC_API_KEY is still using 'your_key_here'", flush=True)
 
         # Store in history
         user_data[user_id]["history"].append({
