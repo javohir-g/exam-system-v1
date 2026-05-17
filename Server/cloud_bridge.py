@@ -337,9 +337,9 @@ def dashboard():
         base_data = user_data.get(uid, {"history": [], "last_seen": "Never", "last_img": None})
         data = base_data.copy()
         
-        # Calculate ESP online status (active in last 20 seconds)
+        # Calculate ESP online status (active in last 12 seconds)
         last_poll = heartbeats.get(uid, 0)
-        data["esp_online"] = (now - last_poll) < 20
+        data["esp_online"] = (now - last_poll) < 12
         all_users[uid] = data
         
     return render_template("dashboard.html", users=all_users)
