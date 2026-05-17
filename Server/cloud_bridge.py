@@ -127,7 +127,7 @@ def ping():
 
 @app.route("/poll", methods=["GET"])
 def poll():
-    """ESP32 calls this to get pending answers."""
+    """ESP32 calls this to get pending answers. Pops the first command from the user's queue."""
     if request.headers.get("X-Secret") != SECRET_KEY:
         return "Unauthorized", 401
     
@@ -135,23 +135,29 @@ def poll():
     if not user_id:
         return "Missing user_id", 400
     
-    # Record activity
     uid = str(user_id)
     heartbeats[uid] = time.time()
     if uid in user_data:
         user_data[uid]["last_seen"] = time.strftime("%H:%M:%S")
     
-    data = answer_queue.get(user_id, {"count": 0, "count2": 0, "cmd_id": 0})
-    count = data.get("count", 0)
-    count2 = data.get("count2", 0)
-    cmd_id = data.get("cmd_id", 0)
+    # answer_queue[user_id] is now a list
+    queue = answer_queue.get(user_id, [])
+    if not isinstance(queue, list):
+        queue = []
 
-    if count > 0:
-        answer_queue[user_id] = {"count": 0, "count2": 0, "cmd_id": cmd_id}
+    if queue:
+        # Take the first command
+        data = queue.pop(0)
+        count = data.get("count", 0)
+        count2 = data.get("count2", 0)
+        cmd_id = data.get("cmd_id", 0)
+        
+        answer_queue[user_id] = queue
         save_data()
-        print(f"[*] Polled User {user_id}: count={count} count2={count2} (ID: {cmd_id})", flush=True)
+        print(f"[*] Polled User {user_id}: {count}/{count2} (Remaining: {len(queue)})", flush=True)
+        return jsonify({"count": count, "count2": count2, "cmd_id": cmd_id}), 200
     
-    return jsonify({"count": count, "count2": count2, "cmd_id": cmd_id}), 200
+    return jsonify({"count": 0, "count2": 0, "cmd_id": 0}), 200
 
 
 def process_batch(user_id, filepaths, ts):
@@ -188,12 +194,11 @@ def process_batch(user_id, filepaths, ts):
                     "TASK TYPE DETECTION:\n"
                     "- If this is a MULTIPLE CHOICE question (options A/B/C/D/E/F): return type 'choice'\n"
                     "- If this is a DRAG & DROP task (match, order, categorize): return type 'drag'\n\n"
-                    "FOR CHOICE: In 'answer' put the index: 1=A, 2=B, 3=C, 4=D, 5=E, 6=F. Set 'answer2' to 0.\n"
-                    "FOR DRAG: In 'answer' put the SOURCE item number. In 'answer2' put the DESTINATION slot number.\n"
-                    "  Items/slots are numbered from top-to-bottom, left-to-right starting from 1.\n"
-                    "If uncertain, return answer=0 and answer2=0.\n\n"
+                    "FOR CHOICE: In 'answer' put the index: 1=A, 2=B, 3=C, 4=D, 5=E, 6=F. Set 'matches' to null.\n"
+                    "FOR DRAG: In 'matches' field, return a LIST of all correct pairs: [{\"s\": source_idx, \"d\": dest_idx}, ...].\n"
+                    "  's' is the item number, 'd' is the target slot number (1-based, top-to-bottom/left-to-right).\n\n"
                     "In 'reasoning' briefly explain in Russian.\n\n"
-                    "Respond ONLY with raw JSON: {\"type\": \"choice|drag\", \"reasoning\": \"...\", \"answer\": <int>, \"answer2\": <int>}"
+                    "Respond ONLY with raw JSON: {\"type\": \"choice|drag\", \"reasoning\": \"...\", \"answer\": <int>, \"matches\": [{\"s\":<int>,\"d\":<int>}, ...]}"
                 )
             })
 
@@ -212,13 +217,22 @@ def process_batch(user_id, filepaths, ts):
                     content = content[4:]
 
             parsed = json.loads(content.strip())
-            answer = parsed.get("answer", 0)
-            answer2 = parsed.get("answer2", 0)
             task_type = parsed.get("type", "choice")
             reasoning = parsed.get("reasoning", "Parsed OK")
+            
+            # Populate the queue
+            user_queue = []
+            if task_type == "drag":
+                matches = parsed.get("matches", [])
+                for i, m in enumerate(matches):
+                    user_queue.append({"count": m.get("s", 0), "count2": m.get("d", 0), "cmd_id": ts + i})
+                answer = matches[0].get("s", 0) if matches else 0
+            else:
+                answer = parsed.get("answer", 0)
+                user_queue.append({"count": answer, "count2": 0, "cmd_id": ts})
 
-            answer_queue[user_id] = {"count": answer, "count2": answer2, "cmd_id": ts}
-            print(f"[Claude] User {user_id} -> type={task_type} answer={answer} answer2={answer2} (CMD_ID: {ts})", flush=True)
+            answer_queue[user_id] = user_queue
+            print(f"[Claude] User {user_id} -> type={task_type}, queued {len(user_queue)} commands.", flush=True)
 
         except Exception as ai_e:
             print(f"[!] Claude Exception: {ai_e}", flush=True)
