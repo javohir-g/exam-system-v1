@@ -119,8 +119,13 @@ def health():
 def ping():
     """Heartbeat from ESP32."""
     user_id = request.args.get("user_id")
+    rssi = request.args.get("rssi")
     if user_id:
         heartbeats[user_id] = time.time()
+        if user_id not in user_data:
+            user_data[user_id] = {"history": []}
+        if rssi:
+            user_data[user_id]["rssi"] = int(rssi)
     return jsonify({"status": "alive"}), 200
 
 @app.route("/poll", methods=["GET"])
@@ -130,6 +135,7 @@ def poll():
         return "Unauthorized", 401
     
     user_id = request.args.get("user_id")
+    rssi = request.args.get("rssi")
     if not user_id:
         return "Missing user_id", 400
     
@@ -137,6 +143,8 @@ def poll():
     heartbeats[uid] = time.time()
     if uid in user_data:
         user_data[uid]["last_seen"] = time.strftime("%H:%M:%S")
+        if rssi:
+            user_data[uid]["rssi"] = int(rssi)
     
     # answer_queue[user_id] is now a list
     queue = answer_queue.get(user_id, [])
@@ -200,7 +208,8 @@ def process_batch(user_id, filepaths, ts):
                     "   If a slot cannot be filled by the provided buttons, set its 's' to 0.\n"
                     "   Output format: [{\"s\": button_idx, \"d\": 1}, {\"s\": button_idx, \"d\": 2}, ...]\n\n"
                     "In 'reasoning' briefly explain in Russian which visual boxes you identified and why you matched them.\n\n"
-                    "Respond ONLY with raw JSON: {\"type\": \"choice|drag\", \"reasoning\": \"...\", \"answer\": <int>, \"matches\": [{\"s\":<int>,\"d\":<int>}, ...]}"
+                    "ADDITIONAL: In 'confidence' return a number from 0 to 1 indicating your certainty.\n\n"
+                    "Respond ONLY with raw JSON: {\"type\": \"choice|drag\", \"reasoning\": \"...\", \"answer\": <int>, \"confidence\": <float>, \"matches\": [{\"s\":<int>,\"d\":<int>}, ...]}"
                 )
             })
 
@@ -221,10 +230,11 @@ def process_batch(user_id, filepaths, ts):
             parsed = json.loads(content.strip())
             task_type = parsed.get("type", "choice")
             reasoning = parsed.get("reasoning", "Parsed OK")
+            confidence = parsed.get("confidence", 0.0)
             
             # Populate the queue
             user_queue = []
-            tg_answer = str(answer) # Fallback
+            tg_answer = "0"
 
             if task_type == "drag":
                 matches = parsed.get("matches", [])
@@ -232,20 +242,13 @@ def process_batch(user_id, filepaths, ts):
                 sorted_matches = sorted(matches, key=lambda x: x.get('d', 0))
                 
                 for i, m in enumerate(sorted_matches):
-                    # Set count2=0 so ESP32 only vibrates the button number (count)
                     user_queue.append({"count": m.get("s", 0), "count2": 0, "cmd_id": ts + i})
                 
-                # Format for Telegram: 
-                # 1) 1
-                # 2) 3
-                # 3) 2
                 tg_answer = "\n".join([f"{m.get('d')}) {m.get('s')}" for m in sorted_matches])
-                answer_val = sorted_matches[0].get("s", 0) if sorted_matches else 0
             else:
                 answer_val = parsed.get("answer", 0)
                 user_queue.append({"count": answer_val, "count2": 0, "cmd_id": ts})
                 
-                # Format for Telegram: "3 (C)"
                 letters = {1: "A", 2: "B", 3: "C", 4: "D", 5: "E", 6: "F"}
                 tg_answer = f"{answer_val} ({letters.get(answer_val, '?')})"
 
@@ -257,24 +260,54 @@ def process_batch(user_id, filepaths, ts):
             traceback.print_exc()
             reasoning = f"Claude Error: {str(ai_e)}"
             tg_answer = "Error"
+            confidence = 0.0
 
     if user_id not in user_data:
         user_data[user_id] = {"history": []}
+    
+    # Store ALL filenames from the batch
+    filenames = [os.path.basename(f) for f in filepaths]
+    
     user_data[user_id]["history"].append({
         "timestamp": get_now(),
-        "filename": os.path.basename(filepaths[0]),
-        "answer": tg_answer, # Store the pretty string in history
-        "reasoning": reasoning
+        "filenames": filenames,
+        "answer": tg_answer,
+        "reasoning": reasoning,
+        "confidence": confidence
     })
     send_to_telegram(user_id, filepaths, tg_answer, reasoning)
     save_data()
+
+@app.route("/vibrate", methods=["POST"])
+def vibrate():
+    """Manually add a vibration command to the queue."""
+    if SECRET_KEY and request.headers.get("X-Secret") != SECRET_KEY:
+        # Check either header or JSON secret for flexibility from browser
+        data = request.json or {}
+        if data.get("secret") != SECRET_KEY:
+            return "Unauthorized", 401
+
+    data = request.json
+    user_id = str(data.get("user_id"))
+    count = int(data.get("count", 1))
+    
+    if user_id not in answer_queue:
+        answer_queue[user_id] = []
+    
+    # Priority vibration: insert at front
+    answer_queue[user_id].insert(0, {"count": count, "count2": 0, "cmd_id": int(time.time())})
+    save_data()
+    print(f"[*] Manual Vibrate: User {user_id} (count={count})", flush=True)
+    return jsonify({"status": "queued"}), 200
+
 
 
 @app.route("/upload", methods=["POST"])
 def upload():
     """Receives a photo from the agent. Buffers for 3s, then processes all."""
     user_id = request.headers.get("X-User-Id", "1")
-    print(f"[*] Received upload from User {user_id}", flush=True)
+    rssi = request.headers.get("X-RSSI")
+    print(f"[*] Received upload from User {user_id} (RSSI: {rssi})", flush=True)
 
     if SECRET_KEY and request.headers.get("X-Secret") != SECRET_KEY:
         return "Unauthorized", 401
@@ -297,6 +330,8 @@ def upload():
             user_data[user_id] = {"history": []}
         user_data[user_id]["last_img"] = filename
         user_data[user_id]["last_seen"] = get_now()
+        if rssi:
+            user_data[user_id]["rssi"] = int(rssi)
 
         # --- 3-second batch buffer ---
         if user_id in pending_uploads and pending_uploads[user_id]["timer"] is not None:

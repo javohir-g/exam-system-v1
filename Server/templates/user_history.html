@@ -5,28 +5,43 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Node {{ uid }} History | Chat</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg: #111111;
-            --border: #333333;
-            --text: #eeeeee;
-            --text-muted: #888888;
-            --accent: #2563eb;
-            --agent-bubble: #1a1a1a;
-            --ai-bubble: #222222;
+            --bg-deep: #05010a;
+            --accent-purple: #7c2dff;
+            --accent-magenta: #ff2d85;
+            --glass: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --text-main: #ffffff;
+            --text-dim: rgba(255, 255, 255, 0.6);
+            --bubble-purple: linear-gradient(135deg, #7c2dff, #ff2d85);
+        }
+
+        * {
+            box-sizing: border-box;
+            transition: all 0.2s ease;
         }
 
         body {
-            background-color: var(--bg);
-            color: var(--text);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-deep);
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(124, 45, 255, 0.1) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(255, 45, 133, 0.1) 0%, transparent 40%);
+            background-attachment: fixed;
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
             margin: 0;
             padding: 0;
+            min-height: 100vh;
         }
 
         header {
-            background-color: #1a1a1a;
-            border-bottom: 1px solid var(--border);
+            background: rgba(10, 5, 20, 0.8);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--glass-border);
             padding: 15px 30px;
             display: flex;
             align-items: center;
@@ -44,24 +59,34 @@
 
         header h1 {
             margin: 0;
-            font-size: 1rem;
-            font-weight: 600;
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.1rem;
+            font-weight: 700;
+            letter-spacing: -0.2px;
         }
 
         .back-link {
-            color: var(--text-muted);
+            color: var(--text-main);
             text-decoration: none;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             font-weight: 700;
-            border: 1px solid var(--border);
-            padding: 4px 10px;
-            border-radius: 2px;
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            padding: 8px 16px;
+            border-radius: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .back-link:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateX(-5px);
         }
 
         .chat-container {
-            max-width: 1000px;
+            max-width: 900px;
             margin: 0 auto;
-            padding: 30px;
+            padding: 40px 20px;
             display: flex;
             flex-direction: column;
             gap: 40px;
@@ -70,132 +95,276 @@
         .message-group {
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 20px;
         }
 
-        /* Agent (Right) */
+        /* Bubbles Common */
+        .msg-bubble {
+            max-width: 80%;
+            padding: 16px 20px;
+            border-radius: 20px;
+            position: relative;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        /* Agent (Right) - Image focused */
         .msg-agent {
             align-self: flex-end;
-            max-width: 60%;
             display: flex;
             flex-direction: column;
             align-items: flex-end;
+            width: 70%;
         }
 
-        .screenshot-bubble {
-            background-color: var(--agent-bubble);
-            border: 1px solid var(--border);
-            border-radius: 8px 8px 0 8px;
-            padding: 5px;
-            overflow: hidden;
+        .screenshot-container {
             width: 100%;
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 6px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
         }
 
-        .screenshot-bubble img {
+        .screenshot-container img {
             width: 100%;
             display: block;
-            border-radius: 4px;
+            border-radius: 18px;
         }
 
-        /* AI (Left) */
+        /* AI (Left) - Response bubble */
         .msg-ai {
             align-self: flex-start;
-            max-width: 75%;
             display: flex;
             flex-direction: column;
             align-items: flex-start;
+            width: 80%;
         }
 
         .ai-bubble {
-            background-color: var(--ai-bubble);
-            border: 1px solid var(--border);
-            border-radius: 8px 8px 8px 0;
-            padding: 15px;
-            border-left: 3px solid var(--accent);
+            background: var(--bubble-purple);
+            color: white;
+            border-radius: 24px 24px 24px 6px;
+            box-shadow: 0 10px 25px rgba(124, 45, 255, 0.3);
+            padding: 24px;
         }
 
         .msg-meta {
-            font-size: 0.65rem;
-            color: var(--text-muted);
-            font-family: monospace;
-            margin-bottom: 4px;
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            font-weight: 600;
+            margin-top: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .ai-answer {
-            font-weight: 700;
-            color: var(--accent);
-            font-size: 1.1rem;
-            margin-bottom: 8px;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 800;
+            font-size: 1.4rem;
             display: block;
+            margin-bottom: 12px;
+            color: #ffffff;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
 
         .ai-reasoning {
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            line-height: 1.5;
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.9);
+            line-height: 1.6;
             margin: 0;
         }
 
         .chat-end {
             text-align: center;
-            padding: 40px 0;
-            color: #333;
-            font-size: 0.7rem;
-            font-weight: 800;
-            letter-spacing: 2px;
+            padding: 60px 0;
+            color: var(--text-dim);
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.8rem;
+            font-weight: 700;
+            letter-spacing: 3px;
+            text-transform: uppercase;
         }
 
         @media (max-width: 768px) {
+            .msg-agent, .msg-ai { width: 95%; }
+            .chat-container { padding: 20px; }
+        }
+    </style>
+</head>
 
-            .msg-agent,
-            .msg-ai {
-                max-width: 90%;
-            }
-
-            .chat-container {
-                padding: 15px;
-            }
+    <style>
+        /* ... existing styles ... */
+        .confidence-container {
+            margin-top: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            height: 4px;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .confidence-bar {
+            height: 100%;
+            background: var(--accent-magenta);
+            width: 0%;
+        }
+        .vibrate-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .vibrate-input {
+            width: 50px;
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            color: white;
+            border-radius: 8px;
+            padding: 8px;
+            text-align: center;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 700;
+        }
+        .vibrate-btn {
+            background: var(--bubble-purple);
+            border: none;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 0.8rem;
+        }
+        .vibrate-btn:active { transform: scale(0.95); }
+        
+        /* Lightbox */
+        #lightbox {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.9);
+            z-index: 2000;
+            padding: 40px;
+            cursor: zoom-out;
+            justify-content: center;
+            align-items: center;
+        }
+        #lightbox img {
+            max-width: 95%;
+            max-height: 95%;
+            object-fit: contain;
+            border-radius: 10px;
+        }
+        
+        .multi-photo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
         }
     </style>
 </head>
 
 <body>
+    <div id="lightbox" onclick="this.style.display='none'">
+        <img src="" id="lightbox-img">
+    </div>
     <header>
         <div class="header-left">
-            <a href="/dashboard" class="back-link">CONSOLE</a>
-            <h1>NODE {{ uid }} | LIVE TRANSMISSION</h1>
+            <a href="/dashboard" class="back-link">← CONSOLE</a>
+            <h1>NODE {{ uid }} :: LIVE TRANSMISSION</h1>
         </div>
-        <div class="msg-meta">ENCRYPTED STREAM</div>
+        <div class="vibrate-controls">
+            <input type="number" id="vibrate-count" class="vibrate-input" value="1" min="1" max="9">
+            <button onclick="sendVibrate()" class="vibrate-btn">VIBRATE</button>
+        </div>
     </header>
 
-    <div class="chat-container">
+    <div class="chat-container" id="chat-box">
         {% for entry in history %}
         <div class="message-group">
             <!-- AGENT MESSAGE (Outgoing) -->
             <div class="msg-agent">
-                <div class="msg-meta">{{ entry.timestamp }} | AGENT UPLOAD</div>
-                <div class="screenshot-bubble">
-                    <img src="/screenshots/{{ entry.filename }}" alt="Agent Screenshot">
+                <div class="screenshot-container">
+                    <div class="multi-photo-grid">
+                        {% if entry.filenames %}
+                            {% for fname in entry.filenames %}
+                            <img src="/screenshots/{{ fname }}" onclick="openImage(this.src)" style="cursor: zoom-in;">
+                            {% endfor %}
+                        {% else %}
+                            <img src="/screenshots/{{ entry.filename }}" onclick="openImage(this.src)" style="cursor: zoom-in;">
+                        {% endif %}
+                    </div>
                 </div>
+                <div class="msg-meta">AGENT UPLOAD • {{ entry.timestamp }}</div>
             </div>
 
             <!-- AI MESSAGE (Incoming) -->
             <div class="msg-ai">
-                <div class="msg-meta">SECURE AI RESPONSE</div>
                 <div class="ai-bubble">
-                    <span class="ai-answer">RECOMMENDED KEY: {{ entry.answer if entry.answer else "UNDEFINED" }}</span>
+                    <span class="ai-answer">RECOMMENDED: {{ entry.answer if entry.answer else "UNDEFINED" }}</span>
                     <p class="ai-reasoning">{{ entry.reasoning }}</p>
+                    
+                    {% if entry.confidence is defined %}
+                    <div class="msg-meta">CONFIDENCE: {{ (entry.confidence * 100)|round|int }}%</div>
+                    <div class="confidence-container">
+                        <div class="confidence-bar" style="width: {{ entry.confidence * 100 }}%"></div>
+                    </div>
+                    {% endif %}
                 </div>
+                <div class="msg-meta">AI ANALYSIS • DONE</div>
             </div>
         </div>
         {% endfor %}
 
         {% if not history %}
-        <div class="chat-end">NO DATA RECEIVED FOR THIS NODE</div>
+        <div class="chat-end">WAITING FOR DATA PACKETS...</div>
         {% else %}
-        <div class="chat-end">END OF SECURE LOGS</div>
+        <div class="chat-end">TRANSMISSION LOGS END</div>
         {% endif %}
     </div>
+
+    <script>
+        function openImage(src) {
+            document.getElementById('lightbox-img').src = src;
+            document.getElementById('lightbox').style.display = 'flex';
+        }
+
+        function sendVibrate() {
+            const count = document.getElementById('vibrate-count').value;
+            fetch('/vibrate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: "{{ uid }}",
+                    count: parseInt(count),
+                    secret: "super-secret-key"
+                })
+            }).then(r => {
+                if(r.ok) {
+                    const btn = document.querySelector('.vibrate-btn');
+                    btn.innerText = 'SENT ✓';
+                    setTimeout(() => btn.innerText = 'VIBRATE', 1000);
+                }
+            });
+        }
+
+        // Live Mode Auto-refresh
+        let lastHistoryCount = {{ history|length }};
+        setInterval(() => {
+            fetch(window.location.href).then(r => r.text()).then(html => {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const newChat = doc.getElementById('chat-box');
+                const newItems = doc.querySelectorAll('.message-group');
+                
+                if (newItems.length > lastHistoryCount) {
+                    document.getElementById('chat-box').innerHTML = newChat.innerHTML;
+                    lastHistoryCount = newItems.length;
+                    // Auto-scroll to bottom
+                    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+                }
+            });
+        }, 3000);
+    </script>
 </body>
 
 </html>

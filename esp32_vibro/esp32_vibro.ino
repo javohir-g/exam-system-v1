@@ -19,7 +19,7 @@ const char* reportUrl = "https://exam-system-v1.onrender.com/esp_report";
 const char* secretKey = "super-secret-key";
 
 // Change this ID for each device (1-15)
-const int USER_ID = 6; 
+const int USER_ID = 4; 
 
 // Pin for XIAO ESP32C3
 const int MOTOR_PIN = D6; 
@@ -100,7 +100,7 @@ void loop() {
     if(client) {
       client->setInsecure(); // Skip SSL certificate verification
       HTTPClient http;
-      String url = String(pollUrl) + "?user_id=" + String(USER_ID);
+      String url = String(pollUrl) + "?user_id=" + String(USER_ID) + "&rssi=" + String(WiFi.RSSI());
       http.begin(*client, url);
       http.addHeader("X-Secret", secretKey);
       http.setTimeout(5000); // 5 sec timeout
