@@ -151,8 +151,9 @@ def upload():
         user_data[user_id]["last_img"] = filename
         user_data[user_id]["last_seen"] = get_now()
 
-        # AI INTEGRATION (Claude 3.5 Sonnet)
+        # AI INTEGRATION (Claude)
         ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+        CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-3-5-sonnet-20240620")
         answer = 0
         reasoning = "No Claude key"
 
@@ -168,7 +169,7 @@ def upload():
                 }
 
                 payload = {
-                    "model": "claude-3-5-sonnet-20240620",
+                    "model": CLAUDE_MODEL,
                     "max_tokens": 512,
                     "messages": [{
                         "role": "user",
