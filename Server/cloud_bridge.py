@@ -109,17 +109,17 @@ def poll():
     if uid in user_data:
         user_data[uid]["last_seen"] = time.strftime("%H:%M:%S")
     
-    data = answer_queue.get(user_id, {"count": 0, "cmd_id": 0})
+    data = answer_queue.get(user_id, {"count": 0, "count2": 0, "cmd_id": 0})
     count = data.get("count", 0)
+    count2 = data.get("count2", 0)
     cmd_id = data.get("cmd_id", 0)
 
     if count > 0:
-        # Reset count but keep cmd_id state if needed (or just clear)
-        answer_queue[user_id] = {"count": 0, "cmd_id": cmd_id} 
+        answer_queue[user_id] = {"count": 0, "count2": 0, "cmd_id": cmd_id}
         save_data()
-        print(f"[*] Polled User {user_id}: returning {count} (ID: {cmd_id})", flush=True)
+        print(f"[*] Polled User {user_id}: count={count} count2={count2} (ID: {cmd_id})", flush=True)
     
-    return jsonify({"count": count, "cmd_id": cmd_id}), 200
+    return jsonify({"count": count, "count2": count2, "cmd_id": cmd_id}), 200
 
 @app.route("/upload", methods=["POST"])
 def upload():
@@ -182,13 +182,17 @@ def upload():
                             {
                                 "type": "text",
                                 "text": (
-                                    "You are an expert Professor. Analyze this exam screenshot and find the correct answer.\n\n"
-                                    "INSTRUCTIONS:\n"
-                                    "1. Identify the question and ALL available options.\n"
-                                    "2. In the 'reasoning' field, briefly explain your logic in Russian.\n"
-                                    "3. In the 'answer' field, provide the integer index of the correct option: 1=A, 2=B, 3=C, 4=D, 5=E, 6=F, and so on.\n"
-                                    "4. If no clear answer is found, return 0.\n\n"
-                                    "Respond ONLY with raw JSON: {\"reasoning\": \"...\", \"answer\": <int>}"
+                                    "You are an expert Professor analyzing an exam screenshot.\n\n"
+                                    "TASK TYPE DETECTION:\n"
+                                    "- If this is a MULTIPLE CHOICE question (options A/B/C/D/E/F): return type 'choice'\n"
+                                    "- If this is a DRAG & DROP task (match, order, categorize): return type 'drag'\n\n"
+                                    "FOR CHOICE: In 'answer' put the index: 1=A, 2=B, 3=C, 4=D, 5=E, 6=F. Set 'answer2' to 0.\n"
+                                    "FOR DRAG: In 'answer' put the SOURCE item number. In 'answer2' put the DESTINATION slot number.\n"
+                                    "  Items/slots are numbered from top-to-bottom, left-to-right starting from 1.\n"
+                                    "  If multiple pairs needed, return the FIRST/MOST IMPORTANT pair.\n"
+                                    "If uncertain, return answer=0 and answer2=0.\n\n"
+                                    "In 'reasoning' briefly explain in Russian.\n\n"
+                                    "Respond ONLY with raw JSON: {\"type\": \"choice|drag\", \"reasoning\": \"...\", \"answer\": <int>, \"answer2\": <int>}"
                                 )
                             }
                         ]
@@ -205,10 +209,12 @@ def upload():
 
                 parsed = json.loads(content.strip())
                 answer = parsed.get("answer", 0)
+                answer2 = parsed.get("answer2", 0)
+                task_type = parsed.get("type", "choice")
                 reasoning = parsed.get("reasoning", "Parsed OK")
 
-                answer_queue[user_id] = {"count": answer, "cmd_id": ts}
-                print(f"[Claude] User {user_id} -> Answer {answer} (CMD_ID: {ts})", flush=True)
+                answer_queue[user_id] = {"count": answer, "count2": answer2, "cmd_id": ts}
+                print(f"[Claude] User {user_id} -> type={task_type} answer={answer} answer2={answer2} (CMD_ID: {ts})", flush=True)
 
             except Exception as ai_e:
                 print(f"[!] Claude Exception: {ai_e}", flush=True)
@@ -236,6 +242,102 @@ def upload():
     except Exception as e:
         traceback.print_exc()
         return jsonify({"status": "error", "info": str(e)}), 500
+
+@app.route("/upload_batch", methods=["POST"])
+def upload_batch():
+    """Agent uploads multiple screenshots for richer AI context."""
+    user_id = request.headers.get("X-User-Id", "1")
+    if SECRET_KEY and request.headers.get("X-Secret") != SECRET_KEY:
+        return "Unauthorized", 401
+
+    ts = int(time.time())
+    filepaths = []
+    for i in range(1, 5):  # Accept up to 4 images: file_1 .. file_4
+        key = f"file_{i}"
+        if key in request.files:
+            f = request.files[key]
+            fname = f"user_{user_id}_{ts}_{i}.jpg"
+            fpath = os.path.join(SCREENSHOT_DIR, fname)
+            f.save(fpath)
+            filepaths.append(fpath)
+
+    if not filepaths:
+        return "No files", 400
+
+    print(f"[*] Batch upload from User {user_id}: {len(filepaths)} image(s)", flush=True)
+
+    if user_id not in user_data:
+        user_data[user_id] = {"history": []}
+    user_data[user_id]["last_img"] = os.path.basename(filepaths[0])
+    user_data[user_id]["last_seen"] = get_now()
+
+    ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip().replace('"', '').replace("'", "")
+    CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-3-5-sonnet-20241022").strip()
+    answer = 0
+    answer2 = 0
+    reasoning = "No Claude key"
+
+    if ANTHROPIC_API_KEY and ANTHROPIC_API_KEY != "your_key_here":
+        try:
+            import anthropic as anthropic_sdk
+            content_blocks = []
+            for fpath in filepaths:
+                with open(fpath, "rb") as f:
+                    b64 = base64.b64encode(f.read()).decode('utf-8')
+                content_blocks.append({"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}})
+
+            content_blocks.append({
+                "type": "text",
+                "text": (
+                    "You are an expert Professor analyzing exam screenshots (multiple images may show different parts of the same question).\n\n"
+                    "TASK TYPE DETECTION:\n"
+                    "- If this is a MULTIPLE CHOICE question (options A/B/C/D/E/F): return type 'choice'\n"
+                    "- If this is a DRAG & DROP task (match, order, categorize): return type 'drag'\n\n"
+                    "FOR CHOICE: In 'answer' put the index: 1=A, 2=B, 3=C, 4=D, 5=E, 6=F. Set 'answer2' to 0.\n"
+                    "FOR DRAG: In 'answer' put the SOURCE item number. In 'answer2' put the DESTINATION slot number.\n"
+                    "  Items/slots are numbered from top-to-bottom, left-to-right starting from 1.\n"
+                    "If uncertain, return answer=0 and answer2=0.\n\n"
+                    "In 'reasoning' briefly explain in Russian.\n\n"
+                    "Respond ONLY with raw JSON: {\"type\": \"choice|drag\", \"reasoning\": \"...\", \"answer\": <int>, \"answer2\": <int>}"
+                )
+            })
+
+            client = anthropic_sdk.Anthropic(api_key=ANTHROPIC_API_KEY)
+            message = client.messages.create(
+                model=CLAUDE_MODEL,
+                max_tokens=512,
+                messages=[{"role": "user", "content": content_blocks}]
+            )
+
+            content = message.content[0].text.strip()
+            if "```" in content:
+                content = content.split("```")[1]
+                if content.startswith("json"):
+                    content = content[4:]
+
+            parsed = json.loads(content.strip())
+            answer = parsed.get("answer", 0)
+            answer2 = parsed.get("answer2", 0)
+            task_type = parsed.get("type", "choice")
+            reasoning = parsed.get("reasoning", "Parsed OK")
+
+            answer_queue[user_id] = {"count": answer, "count2": answer2, "cmd_id": ts}
+            print(f"[Claude Batch] User {user_id} -> type={task_type} answer={answer} answer2={answer2}", flush=True)
+
+        except Exception as ai_e:
+            print(f"[!] Batch Claude Exception: {ai_e}", flush=True)
+            traceback.print_exc()
+            reasoning = f"Claude Error: {str(ai_e)}"
+
+    user_data[user_id]["history"].append({
+        "timestamp": get_now(),
+        "filename": os.path.basename(filepaths[0]),
+        "answer": answer,
+        "reasoning": reasoning
+    })
+    send_to_telegram(user_id, filepaths[0], answer, reasoning)
+    save_data()
+    return jsonify({"user_id": user_id, "answer": answer, "answer2": answer2}), 200
 
 # --- DASHBOARD ROUTES ---
 

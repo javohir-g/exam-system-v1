@@ -56,6 +56,16 @@ void vibrate(int times) {
   Serial.println("--- VIBRATION DONE ---");
 }
 
+void vibrateDrag(int from, int to) {
+  Serial.println("--- DRAG VIBRATION START ---");
+  Serial.print("FROM: "); Serial.println(from);
+  vibrate(from);
+  delay(2000); // 2 second pause between FROM and TO
+  Serial.print("TO: "); Serial.println(to);
+  vibrate(to);
+  Serial.println("--- DRAG VIBRATION DONE ---");
+}
+
 void sendDebugReport(int count, long cmdId, String action) {
   if (wifiMulti.run() == WL_CONNECTED) {
     WiFiClientSecure *client = new WiFiClientSecure;
@@ -103,12 +113,17 @@ void loop() {
 
         if (!error) {
           int count = doc["count"];
+          int count2 = doc["count2"] | 0;
           long cmdId = doc["cmd_id"];
 
           if (count > 0 && cmdId != lastCommandId) {
             lastCommandId = cmdId;
             sendDebugReport(count, cmdId, "vibrating");
-            vibrate(count);
+            if (count2 > 0) {
+              vibrateDrag(count, count2); // Drag & Drop: N pulses → 2s → M pulses
+            } else {
+              vibrate(count); // Standard MCQ vibration
+            }
             sendDebugReport(0, cmdId, "idle");
             delay(5000);
           } else {
