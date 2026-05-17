@@ -210,9 +210,10 @@
                 <div class="card-header">
                     <div class="node-id">NODE {{ "%02d"|format(uid|int) }}</div>
                     <div class="badges">
-                        {% if data.rssi and data.esp_online %}
+                        {% if data.rssi %}
                             {% set r = data.rssi|int %}
-                            <div class="signal-level {{ 'sig-excellent' if r > -60 else 'sig-good' if r > -75 else 'sig-fair' if r > -90 else 'sig-poor' }}">
+                            <div class="signal-level {{ 'sig-excellent' if r > -60 else 'sig-good' if r > -75 else 'sig-fair' if r > -90 else 'sig-poor' }}" 
+                                 style="{{ 'opacity: 0.3;' if not data.esp_online else '' }}">
                                 📶 {{ r }} dBm
                             </div>
                         {% endif %}
