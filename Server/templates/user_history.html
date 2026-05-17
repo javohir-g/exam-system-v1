@@ -183,8 +183,7 @@
             <div class="msg-ai">
                 <div class="msg-meta">SECURE AI RESPONSE</div>
                 <div class="ai-bubble">
-                    <span class="ai-answer">RECOMMENDED KEY: {{ entry.answer if entry.answer > 0 else "UNDEFINED"
-                        }}</span>
+                    <span class="ai-answer">RECOMMENDED KEY: {{ entry.answer if entry.answer else "UNDEFINED" }}</span>
                     <p class="ai-reasoning">{{ entry.reasoning }}</p>
                 </div>
             </div>

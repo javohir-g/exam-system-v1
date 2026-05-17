@@ -220,7 +220,7 @@
                     <div class="timestamp">{{ data.last_seen if data.last_seen != "Never" else "Disconnected" }}</div>
                     {% if data.history %}
                     {% set last = data.history[-1] %}
-                    <div class="result">RESULT: {{ last.answer if last.answer > 0 else "?" }}</div>
+                    <div class="result">RESULT: {{ last.answer if last.answer else "?" }}</div>
                     {% endif %}
                 </div>
             </a>
