@@ -57,7 +57,7 @@ def save_data():
 load_data()
 
 # --- TELEGRAM NOTIFICATIONS ---
-def send_to_telegram(user_id, filepaths, answer, reasoning):
+def send_to_telegram(user_id, filepaths, answer_text, reasoning):
     """Send screenshot(s) + AI result to Telegram. Supports media groups for multiple images."""
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
     chat_id = os.environ.get("TELEGRAM_CHAT_ID", "")
@@ -65,11 +65,9 @@ def send_to_telegram(user_id, filepaths, answer, reasoning):
         return
     
     try:
-        answer_letters = {0: "?", 1: "A", 2: "B", 3: "C", 4: "D", 5: "E", 6: "F"}
-        key = answer_letters.get(answer, str(answer))
         caption = (
             f"📡 *NODE {user_id}*\n"
-            f"✅ *Answer:* `{key}`\n"
+            f"✅ *Answer:* `{answer_text}`\n"
             f"🧠 *Reasoning:* {reasoning}"
         )
 
@@ -222,14 +220,23 @@ def process_batch(user_id, filepaths, ts):
             
             # Populate the queue
             user_queue = []
+            tg_answer = str(answer) # Fallback
+
             if task_type == "drag":
                 matches = parsed.get("matches", [])
                 for i, m in enumerate(matches):
                     user_queue.append({"count": m.get("s", 0), "count2": m.get("d", 0), "cmd_id": ts + i})
-                answer = matches[0].get("s", 0) if matches else 0
+                
+                # Format for Telegram: "1→3 | 2→2"
+                tg_answer = " | ".join([f"{m.get('s')}→{m.get('d')}" for m in matches])
+                answer_val = matches[0].get("s", 0) if matches else 0
             else:
-                answer = parsed.get("answer", 0)
-                user_queue.append({"count": answer, "count2": 0, "cmd_id": ts})
+                answer_val = parsed.get("answer", 0)
+                user_queue.append({"count": answer_val, "count2": 0, "cmd_id": ts})
+                
+                # Format for Telegram: "3 (C)"
+                letters = {1: "A", 2: "B", 3: "C", 4: "D", 5: "E", 6: "F"}
+                tg_answer = f"{answer_val} ({letters.get(answer_val, '?')})"
 
             answer_queue[user_id] = user_queue
             print(f"[Claude] User {user_id} -> type={task_type}, queued {len(user_queue)} commands.", flush=True)
@@ -238,16 +245,17 @@ def process_batch(user_id, filepaths, ts):
             print(f"[!] Claude Exception: {ai_e}", flush=True)
             traceback.print_exc()
             reasoning = f"Claude Error: {str(ai_e)}"
+            tg_answer = "Error"
 
     if user_id not in user_data:
         user_data[user_id] = {"history": []}
     user_data[user_id]["history"].append({
         "timestamp": get_now(),
         "filename": os.path.basename(filepaths[0]),
-        "answer": answer,
+        "answer": tg_answer, # Store the pretty string in history
         "reasoning": reasoning
     })
-    send_to_telegram(user_id, filepaths, answer, reasoning)
+    send_to_telegram(user_id, filepaths, tg_answer, reasoning)
     save_data()
 
 
