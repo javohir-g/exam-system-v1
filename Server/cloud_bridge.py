@@ -191,11 +191,14 @@ def process_batch(user_id, filepaths, ts):
                     prompt_prefix +
                     "TASK TYPE DETECTION:\n"
                     "- If this is a MULTIPLE CHOICE question (options A/B/C/D/E/F): return type 'choice'\n"
-                    "- If this is a DRAG & DROP task (match, order, categorize): return type 'drag'\n\n"
-                    "FOR CHOICE: In 'answer' put the index: 1=A, 2=B, 3=C, 4=D, 5=E, 6=F. Set 'matches' to null.\n"
-                    "FOR DRAG: In 'matches' field, return a LIST of all correct pairs: [{\"s\": source_idx, \"d\": dest_idx}, ...].\n"
-                    "  's' is the item number, 'd' is the target slot number (1-based, top-to-bottom/left-to-right).\n\n"
-                    "In 'reasoning' briefly explain in Russian.\n\n"
+                    "- If this is a DRAG & DROP task (matching items, sorting, or filling code/text gaps): return type 'drag'\n\n"
+                    "FOR CHOICE: In 'answer' put the index: 1=A, 2=B, 3=C, 4=D, 5=E, 6=F.\n\n"
+                    "FOR DRAG & DROP (Filling gaps/Matching):\n"
+                    "1. Identify all EMPTY SLOTS (rectangular boxes, underscores, or gaps). Number them 1, 2, 3... strictly from TOP-TO-BOTTOM.\n"
+                    "2. Identify all SOURCE ITEMS (usually buttons/text at the bottom or side). Number them 1, 2, 3... strictly from LEFT-TO-RIGHT (or top-to-bottom if organized in a column).\n"
+                    "3. In 'matches' return a LIST of all pairs: [{\"s\": source_item_idx, \"d\": target_slot_idx}, ...].\n"
+                    "   Example: If the 2nd button from the bottom goes into the 1st empty box in the code, matches=[{\"s\": 2, \"d\": 1}].\n\n"
+                    "In 'reasoning' briefly explain in Russian which visual boxes you identified and why you matched them.\n\n"
                     "Respond ONLY with raw JSON: {\"type\": \"choice|drag\", \"reasoning\": \"...\", \"answer\": <int>, \"matches\": [{\"s\":<int>,\"d\":<int>}, ...]}"
                 )
             })
