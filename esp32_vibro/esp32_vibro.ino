@@ -25,7 +25,7 @@ const char* secretKey = "super-secret-key";
 const int USER_ID = 5;
 
 // Pin for XIAO ESP32C3
-const int MOTOR_PIN = D9;
+const int MOTOR_PIN = D6;
 
 // --- STATE ---
 long lastCommandId = 0;
