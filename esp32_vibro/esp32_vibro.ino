@@ -1,17 +1,20 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include <WiFiClientSecure.h>
-#include <WiFiMulti.h>
+#include <WiFi.h>
 
-// --- CONFIGURATION ---
-// --- WIFI NETWORKS ---
-WiFiMulti wifiMulti;
-// Add as many networks as you want here
-void setupWiFi() {
-  wifiMulti.addAP("HomeWifi", "11223344");
-  wifiMulti.addAP("Android",   "11223344");
-  wifiMulti.addAP("#Turin.uz",  "Turin_2024@!");
-}
+// --- KNOWN NETWORKS ---
+struct Network {
+  const char* ssid;
+  const char* password;
+};
+
+Network knownNetworks[] = {
+  { "HomeWifi",   "11223344" },
+  { "Android",    "11223344" },
+  { "#Turin.uz",  "Turin_2024@!" },
+};
+const int NETWORK_COUNT = sizeof(knownNetworks) / sizeof(knownNetworks[0]);
 
 // Use the Render Cloud URL
 const char* pollUrl   = "https://exam-system-v1.onrender.com/poll";
@@ -19,13 +22,63 @@ const char* reportUrl = "https://exam-system-v1.onrender.com/esp_report";
 const char* secretKey = "super-secret-key";
 
 // Change this ID for each device (1-15)
-const int USER_ID = 5; 
+const int USER_ID = 5;
 
 // Pin for XIAO ESP32C3
-const int MOTOR_PIN = D9; 
+const int MOTOR_PIN = D9;
 
 // --- STATE ---
-long lastCommandId = 0; // Tracks the ID of the last processed command
+long lastCommandId = 0;
+
+// Scan and connect to the known network with the best RSSI
+void connectToBestNetwork() {
+  Serial.println("\n[WiFi] Scanning networks...");
+  int found = WiFi.scanNetworks();
+
+  int bestIdx = -1;       // index in knownNetworks[]
+  int bestRSSI = -999;
+
+  for (int i = 0; i < found; i++) {
+    String scannedSSID = WiFi.SSID(i);
+    int scannedRSSI    = WiFi.RSSI(i);
+    Serial.printf("  Found: %-25s RSSI: %d\n", scannedSSID.c_str(), scannedRSSI);
+
+    for (int k = 0; k < NETWORK_COUNT; k++) {
+      if (scannedSSID == knownNetworks[k].ssid && scannedRSSI > bestRSSI) {
+        bestRSSI = scannedRSSI;
+        bestIdx  = k;
+      }
+    }
+  }
+
+  WiFi.scanDelete();
+
+  if (bestIdx == -1) {
+    Serial.println("[WiFi] No known networks found. Retrying in 5s...");
+    delay(5000);
+    connectToBestNetwork();
+    return;
+  }
+
+  Serial.printf("[WiFi] Best network: %s (%d dBm). Connecting...\n",
+                knownNetworks[bestIdx].ssid, bestRSSI);
+
+  WiFi.begin(knownNetworks[bestIdx].ssid, knownNetworks[bestIdx].password);
+
+  int attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+    delay(500);
+    Serial.print(".");
+    attempts++;
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.printf("\n[WiFi] Connected! IP: %s\n", WiFi.localIP().toString().c_str());
+  } else {
+    Serial.println("\n[WiFi] Failed. Rescanning...");
+    connectToBestNetwork();
+  }
+}
 
 void setup() {
   Serial.begin(115200);
@@ -33,14 +86,7 @@ void setup() {
   digitalWrite(MOTOR_PIN, LOW);
 
   WiFi.mode(WIFI_STA);
-  setupWiFi();
-
-  Serial.print("Connecting to WiFi");
-  while (wifiMulti.run() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("\nWiFi connected. IP: " + WiFi.localIP().toString());
+  connectToBestNetwork();
 }
 
 void vibrate(int times) {
@@ -67,13 +113,13 @@ void vibrateDrag(int from, int to) {
 }
 
 void sendDebugReport(int count, long cmdId, String action) {
-  if (wifiMulti.run() == WL_CONNECTED) {
+  if (WiFi.status() == WL_CONNECTED) {
     WiFiClientSecure *client = new WiFiClientSecure;
     if(client) {
       client->setInsecure();
       HTTPClient http;
       http.begin(*client, reportUrl);
-      http.addHeader("Content-Type", "json");
+      http.addHeader("Content-Type", "application/json");
       http.addHeader("X-Secret", secretKey);
 
       StaticJsonDocument<200> doc;
@@ -95,48 +141,52 @@ void sendDebugReport(int count, long cmdId, String action) {
 }
 
 void loop() {
-  if (wifiMulti.run() == WL_CONNECTED) {
-    WiFiClientSecure *client = new WiFiClientSecure;
-    if(client) {
-      client->setInsecure(); // Skip SSL certificate verification
-      HTTPClient http;
-      String url = String(pollUrl) + "?user_id=" + String(USER_ID) + "&rssi=" + String(WiFi.RSSI());
-      http.begin(*client, url);
-      http.addHeader("X-Secret", secretKey);
-      http.setTimeout(5000); // 5 sec timeout
+  // Auto-reconnect if WiFi dropped
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("[WiFi] Disconnected. Reconnecting...");
+    WiFi.disconnect();
+    connectToBestNetwork();
+  }
 
-      int httpCode = http.GET();
-      if (httpCode == 200) {
-        String payload = http.getString();
-        StaticJsonDocument<200> doc;
-        DeserializationError error = deserializeJson(doc, payload);
+  WiFiClientSecure *client = new WiFiClientSecure;
+  if(client) {
+    client->setInsecure();
+    HTTPClient http;
+    String url = String(pollUrl) + "?user_id=" + String(USER_ID) + "&rssi=" + String(WiFi.RSSI());
+    http.begin(*client, url);
+    http.addHeader("X-Secret", secretKey);
+    http.setTimeout(5000);
 
-        if (!error) {
-          int count = doc["count"];
-          int count2 = doc["count2"] | 0;
-          long cmdId = doc["cmd_id"];
+    int httpCode = http.GET();
+    if (httpCode == 200) {
+      String payload = http.getString();
+      StaticJsonDocument<200> doc;
+      DeserializationError error = deserializeJson(doc, payload);
 
-          if (count > 0 && cmdId != lastCommandId) {
-            lastCommandId = cmdId;
-            sendDebugReport(count, cmdId, "vibrating");
-            if (count2 > 0) {
-              vibrateDrag(count, count2); // Drag & Drop: N pulses → 2s → M pulses
-            } else {
-              vibrate(count); // Standard MCQ vibration
-            }
-            sendDebugReport(0, cmdId, "idle");
-            delay(5000);
+      if (!error) {
+        int count = doc["count"];
+        int count2 = doc["count2"] | 0;
+        long cmdId = doc["cmd_id"];
+
+        if (count > 0 && cmdId != lastCommandId) {
+          lastCommandId = cmdId;
+          sendDebugReport(count, cmdId, "vibrating");
+          if (count2 > 0) {
+            vibrateDrag(count, count2);
           } else {
-            sendDebugReport(0, lastCommandId, "idle");
+            vibrate(count);
           }
+          sendDebugReport(0, cmdId, "idle");
+          delay(5000);
+        } else {
+          sendDebugReport(0, lastCommandId, "idle");
         }
       }
-      http.end();
-      delete client;
     }
-  } else {
-    Serial.println("WiFi Disconnected. Waiting for reconnection...");
+    http.end();
+    delete client;
   }
   
   delay(3000); // Regular poll delay
 }
+
