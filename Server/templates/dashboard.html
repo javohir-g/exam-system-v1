@@ -10,116 +10,153 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-deep: #0a0a0a;
-            --accent-purple: #7c2dff;
-            --accent-magenta: #ff2d85;
-            --glass: #141414;
-            --border: #222222;
-            --text-main: #ffffff;
-            --text-dim: #888888;
-            --success: #22c55e;
-            --warning: #f59e0b;
-            --danger: #ef4444;
+            --bg-deep: #020617; /* Slate 950 */
+            --bg-radial: radial-gradient(circle at top center, #1e1b4b, #020617);
+            --accent: #38bdf8; /* Sky 400 */
+            --accent-glow: rgba(56, 189, 248, 0.4);
+            --accent-magenta: #f472b6; /* Pink 400 */
+            --glass-bg: rgba(255, 255, 255, 0.02);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --glass-hover: rgba(255, 255, 255, 0.05);
+            --text-main: #f8fafc;
+            --text-dim: #94a3b8;
+            --success: #10b981; /* Emerald 500 */
+            --warning: #f59e0b; /* Amber 500 */
+            --danger: #ef4444; /* Red 500 */
         }
 
         * {
             box-sizing: border-box;
+            margin: 0;
+            padding: 0;
         }
 
         body {
-            background-color: var(--bg-deep);
+            background: var(--bg-radial);
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            background-size: cover;
             color: var(--text-main);
             font-family: 'Inter', -apple-system, sans-serif;
-            margin: 0;
-            padding: 0;
             min-height: 100vh;
         }
 
         header {
-            background: #111111;
-            border-bottom: 1px solid var(--border);
-            padding: 15px 30px;
+            background: rgba(2, 6, 23, 0.7);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--glass-border);
+            padding: 20px 40px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             position: sticky;
             top: 0;
             z-index: 1000;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
         }
 
         header h1 {
-            margin: 0;
-            font-size: 1.1rem;
-            font-weight: 700;
-            letter-spacing: 0.5px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.4rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+            background: linear-gradient(90deg, #fff, var(--text-dim));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
 
         .stats {
-            font-size: 0.8rem;
-            font-weight: 500;
+            font-size: 0.85rem;
+            font-weight: 600;
             color: var(--text-dim);
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-dot {
+            height: 8px;
+            width: 8px;
+            background-color: var(--success);
+            border-radius: 50%;
+            display: inline-block;
+            box-shadow: 0 0 8px var(--success);
         }
 
         .container {
-            padding: 25px;
-            max-width: 1800px;
+            padding: 40px;
+            max-width: 1920px;
             margin: 0 auto;
         }
 
         .grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-            gap: 15px;
+            gap: 20px;
         }
 
         .card {
-            background: var(--glass);
-            border: 1px solid var(--border);
-            border-radius: 8px;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
             display: flex;
             flex-direction: column;
             text-decoration: none;
             color: inherit;
             overflow: hidden;
+            backdrop-filter: blur(12px);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .card:hover {
-            border-color: #444444;
-            background: #1a1a1a;
+            border-color: rgba(255, 255, 255, 0.15);
+            background: var(--glass-hover);
+            transform: translateY(-4px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 15px var(--accent-glow);
         }
 
         .card-header {
-            padding: 12px 15px;
+            padding: 16px 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom: 1px solid var(--border);
+            border-bottom: 1px solid var(--glass-border);
+            background: rgba(0,0,0,0.2);
         }
 
         .node-id {
-            font-weight: 600;
-            font-size: 0.9rem;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 700;
+            font-size: 1.1rem;
+            letter-spacing: 0.5px;
+            color: #fff;
         }
 
         .badges {
             display: flex;
-            gap: 6px;
+            gap: 8px;
+            align-items: center;
         }
 
         .badge {
             font-size: 0.65rem;
             font-weight: 700;
             padding: 4px 8px;
-            border-radius: 4px;
+            border-radius: 6px;
             text-transform: uppercase;
-            background: #1f1f1f;
-            border: 1px solid #333;
+            background: rgba(0,0,0,0.4);
+            border: 1px solid var(--glass-border);
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
         }
 
-        .badge-active { color: var(--success); }
+        .badge-active { color: var(--success); border-color: rgba(16,185,129,0.3); background: rgba(16,185,129,0.1); }
         .badge-idle { color: var(--text-dim); }
-        .badge-esp { color: var(--warning); }
-        .badge-offline { color: var(--danger); }
+        .badge-esp { color: var(--accent); border-color: rgba(56,189,248,0.3); background: rgba(56,189,248,0.1); }
+        .badge-offline { color: var(--danger); border-color: rgba(239,68,68,0.3); background: rgba(239,68,68,0.1); }
 
         .signal-level {
             display: flex;
@@ -127,90 +164,124 @@
             gap: 2px;
             height: 14px;
             width: 25px;
+            margin-right: 4px;
         }
         .signal-bar {
             flex: 1;
-            background: #222;
+            background: #334155;
             border-radius: 1px;
             min-height: 2px;
+            transition: background 0.3s ease;
         }
-        /* Bar heights */
         .bar-1 { height: 20%; }
         .bar-2 { height: 40%; }
         .bar-3 { height: 60%; }
         .bar-4 { height: 80%; }
         .bar-5 { height: 100%; }
 
-        /* Levels Color Logic */
-        .sig-lv-5 .signal-bar { background: var(--success); }
-        .sig-lv-4 .signal-bar:nth-child(-n+4) { background: #a3e635; }
-        .sig-lv-3 .signal-bar:nth-child(-n+3) { background: var(--warning); }
-        .sig-lv-2 .signal-bar:nth-child(-n+2) { background: #f97316; }
-        .sig-lv-1 .signal-bar:nth-child(1) { background: var(--danger); }
-        .sig-lv-0 .signal-bar { background: #222; }
+        /* Color Logic with Glows */
+        .sig-lv-5 .signal-bar { background: var(--success); box-shadow: 0 0 4px var(--success); }
+        .sig-lv-4 .signal-bar:nth-child(-n+4) { background: #84cc16; box-shadow: 0 0 4px #84cc16;}
+        .sig-lv-3 .signal-bar:nth-child(-n+3) { background: var(--warning); box-shadow: 0 0 4px var(--warning);}
+        .sig-lv-2 .signal-bar:nth-child(-n+2) { background: #f97316; box-shadow: 0 0 4px #f97316;}
+        .sig-lv-1 .signal-bar:nth-child(1) { background: var(--danger); box-shadow: 0 0 4px var(--danger);}
 
         .preview {
             width: 100%;
             aspect-ratio: 16/10;
-            background-color: #000;
+            background-color: rgba(0,0,0,0.6);
             display: flex;
             align-items: center;
             justify-content: center;
             overflow: hidden;
+            position: relative;
         }
 
         .preview img {
             width: 100%;
             height: 100%;
-            object-fit: cover;
+            object-fit: contain;
+            transition: transform 0.4s ease;
+        }
+        
+        .card:hover .preview img {
+            transform: scale(1.05);
         }
 
         .no-signal {
-            font-size: 0.75rem;
-            color: #444;
+            font-size: 0.8rem;
+            color: #475569;
             font-weight: 600;
+            letter-spacing: 2px;
         }
 
         .card-footer {
-            padding: 12px 15px;
-            border-top: 1px solid var(--border);
-        }
-
-        .footer-top {
+            padding: 16px 20px;
+            border-top: 1px solid var(--glass-border);
             display: flex;
             justify-content: space-between;
             align-items: center;
+            background: rgba(0,0,0,0.1);
+        }
+
+        .footer-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
         }
 
         .timestamp {
-            font-size: 0.7rem;
+            font-size: 0.75rem;
             color: var(--text-dim);
-            font-family: monospace;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .timestamp::before {
+            content: '🕑';
+            font-size: 0.8rem;
         }
 
         .result {
             font-weight: 700;
-            font-size: 0.8rem;
+            font-size: 0.9rem;
             color: var(--accent-magenta);
+            text-shadow: 0 0 8px rgba(244, 114, 182, 0.3);
         }
 
         .reconnect-btn {
-            background: none;
-            border: 1px solid #333;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--glass-border);
             color: var(--text-dim);
-            border-radius: 6px;
-            padding: 2px 7px;
+            border-radius: 8px;
+            padding: 6px 10px;
             cursor: pointer;
-            font-size: 0.9rem;
+            font-size: 1rem;
             line-height: 1;
-            transition: all 0.15s;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
-        .reconnect-btn:hover { border-color: var(--warning); color: var(--warning); }
-        .reconnect-btn.sent { border-color: var(--success); color: var(--success); }
+        .reconnect-btn:hover { 
+            border-color: var(--accent); 
+            color: var(--accent); 
+            background: rgba(56, 189, 248, 0.1);
+            transform: rotate(15deg);
+        }
+        .reconnect-btn.sent { 
+            border-color: var(--success); 
+            color: var(--success); 
+            background: rgba(16, 185, 129, 0.1);
+            transform: rotate(0deg);
+        }
 
-        @media (max-width: 600px) {
-            .container { padding: 15px; }
+        @media (max-width: 768px) {
+            .container { padding: 20px; }
             .grid { grid-template-columns: 1fr; }
+            header { padding: 15px 20px; }
         }
     </style>
     <script>
@@ -266,16 +337,16 @@
                     {% endif %}
                 </div>
                 <div class="card-footer">
-                    <div class="footer-top">
+                    <div class="footer-info">
                         <div class="timestamp">{{ data.last_seen if data.last_seen != "Never" else "Disconnected" }}</div>
-                        {% if data.esp_online %}
-                        <button class="reconnect-btn" onclick="event.preventDefault(); reconnectNode('{{ uid }}')">↺</button>
-                        {% endif %}
                         {% if data.history %}
                         {% set last = data.history[-1] %}
                         <div class="result">{{ last.answer if last.answer else "..." }}</div>
                         {% endif %}
                     </div>
+                    {% if data.esp_online %}
+                    <button class="reconnect-btn" onclick="event.preventDefault(); reconnectNode('{{ uid }}')">↺</button>
+                    {% endif %}
                 </div>
             </a>
             {% endfor %}
