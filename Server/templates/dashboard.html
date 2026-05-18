@@ -122,17 +122,32 @@
         .badge-offline { color: var(--danger); }
 
         .signal-level {
-            font-size: 0.6rem;
-            font-weight: 800;
             display: flex;
-            align-items: center;
+            align-items: flex-end;
             gap: 2px;
+            height: 14px;
+            width: 25px;
         }
-        .sig-excellent { color: var(--success); }
-        .sig-good { color: #a3e635; }
-        .sig-fair { color: var(--warning); }
-        .sig-poor { color: var(--danger); }
-        .sig-none { color: #444; }
+        .signal-bar {
+            flex: 1;
+            background: #222;
+            border-radius: 1px;
+            min-height: 2px;
+        }
+        /* Bar heights */
+        .bar-1 { height: 20%; }
+        .bar-2 { height: 40%; }
+        .bar-3 { height: 60%; }
+        .bar-4 { height: 80%; }
+        .bar-5 { height: 100%; }
+
+        /* Levels Color Logic */
+        .sig-lv-5 .signal-bar { background: var(--success); }
+        .sig-lv-4 .signal-bar:nth-child(-n+4) { background: #a3e635; }
+        .sig-lv-3 .signal-bar:nth-child(-n+3) { background: var(--warning); }
+        .sig-lv-2 .signal-bar:nth-child(-n+2) { background: #f97316; }
+        .sig-lv-1 .signal-bar:nth-child(1) { background: var(--danger); }
+        .sig-lv-0 .signal-bar { background: #222; }
 
         .preview {
             width: 100%;
@@ -210,9 +225,14 @@
                 <div class="card-header">
                     <div class="node-id">NODE {{ "%02d"|format(uid|int) }}</div>
                     <div class="badges">
-                        {% set r = data.rssi if data.rssi else 0 %}
-                        <div class="signal-level {{ 'sig-excellent' if r < 0 and r > -60 else 'sig-good' if r < 0 and r > -75 else 'sig-fair' if r < 0 and r > -90 else 'sig-poor' if r < 0 else 'sig-none' }}">
-                            📶 {{ r if r < 0 else '---' }} dBm
+                        {% set r = data.rssi|int if data.rssi else 0 %}
+                        {% set lv = 5 if r < 0 and r > -60 else 4 if r < 0 and r > -70 else 3 if r < 0 and r > -80 else 2 if r < 0 and r > -90 else 1 if r < 0 else 0 %}
+                        <div class="signal-level sig-lv-{{ lv }}" title="{{ r }} dBm">
+                            <div class="signal-bar bar-1"></div>
+                            <div class="signal-bar bar-2"></div>
+                            <div class="signal-bar bar-3"></div>
+                            <div class="signal-bar bar-4"></div>
+                            <div class="signal-bar bar-5"></div>
                         </div>
                         <div class="badge {{ 'badge-active' if data.history else 'badge-idle' }}">
                             {{ 'STREAM' if data.history else 'IDLE' }}

@@ -132,7 +132,9 @@ def ping():
 def poll():
     """ESP32 calls this to get pending answers. Pops the first command from the user's queue."""
     if request.headers.get("X-Secret") != SECRET_KEY:
-        return "Unauthorized", 401
+        # Check query param if header is missing for easier testing
+        if request.args.get("secret") != SECRET_KEY:
+            return "Unauthorized", 401
     
     user_id = request.args.get("user_id")
     rssi = request.args.get("rssi")
@@ -141,10 +143,14 @@ def poll():
     
     uid = str(user_id)
     heartbeats[uid] = time.time()
-    if uid in user_data:
-        user_data[uid]["last_seen"] = time.strftime("%H:%M:%S")
-        if rssi:
-            user_data[uid]["rssi"] = int(rssi)
+    
+    # Initialize user if not exists
+    if uid not in user_data:
+        user_data[uid] = {"history": [], "last_seen": "Never", "last_img": None}
+    
+    user_data[uid]["last_seen"] = time.strftime("%H:%M:%S")
+    if rssi:
+        user_data[uid]["rssi"] = int(rssi)
     
     # answer_queue[user_id] is now a list
     queue = answer_queue.get(user_id, [])
@@ -164,6 +170,26 @@ def poll():
         return jsonify({"count": count, "count2": count2, "cmd_id": cmd_id}), 200
     
     return jsonify({"count": 0, "count2": 0, "cmd_id": 0}), 200
+
+@app.route("/esp_report", methods=["POST"])
+def esp_report():
+    """Receives debug info from ESP32."""
+    if request.headers.get("X-Secret") != SECRET_KEY:
+        return "Unauthorized", 401
+    
+    data = request.json
+    uid = str(data.get("user_id"))
+    rssi = data.get("rssi")
+    
+    heartbeats[uid] = time.time()
+    if uid not in user_data:
+        user_data[uid] = {"history": [], "last_seen": get_now(), "last_img": None}
+    
+    if rssi:
+        user_data[uid]["rssi"] = int(rssi)
+        
+    print(f"[*] Report from Node {uid}: {data.get('action')} (RSSI: {rssi})", flush=True)
+    return "OK", 200
 
 
 def process_batch(user_id, filepaths, ts):
