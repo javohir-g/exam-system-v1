@@ -207,7 +207,7 @@ def process_batch(user_id, filepaths, ts):
                     "3. In 'matches' return a list for EVERY identified slot. YOU MUST NOT SKIP ANY SLOT NUMBER.\n"
                     "   If a slot cannot be filled by the provided buttons, set its 's' to 0.\n"
                     "   Output format: [{\"s\": button_idx, \"d\": 1}, {\"s\": button_idx, \"d\": 2}, ...]\n\n"
-                    "In 'reasoning' briefly explain in Russian which visual boxes you identified and why you matched them. Do not use double quotes inside the string, use single quotes if needed.\n\n"
+                    "In 'reasoning' provide an extremely brief note (1-3 words) in Russian.\n\n"
                     "ADDITIONAL: In 'confidence' return a number from 0 to 1 indicating your certainty.\n\n"
                     "Respond ONLY with raw JSON: {\"type\": \"choice|drag\", \"reasoning\": \"...\", \"answer\": <int>, \"confidence\": <float>, \"matches\": [{\"s\":<int>,\"d\":<int>}, ...]}"
                 )
@@ -216,7 +216,7 @@ def process_batch(user_id, filepaths, ts):
             client = anthropic_sdk.Anthropic(api_key=ANTHROPIC_API_KEY)
             message = client.messages.create(
                 model=CLAUDE_MODEL,
-                max_tokens=1024,
+                max_tokens=256,
                 messages=[{"role": "user", "content": content_blocks}]
             )
 
