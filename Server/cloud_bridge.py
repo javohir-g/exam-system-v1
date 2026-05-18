@@ -207,7 +207,7 @@ def process_batch(user_id, filepaths, ts):
                     "3. In 'matches' return a list for EVERY identified slot. YOU MUST NOT SKIP ANY SLOT NUMBER.\n"
                     "   If a slot cannot be filled by the provided buttons, set its 's' to 0.\n"
                     "   Output format: [{\"s\": button_idx, \"d\": 1}, {\"s\": button_idx, \"d\": 2}, ...]\n\n"
-                    "In 'reasoning' briefly explain in Russian which visual boxes you identified and why you matched them.\n\n"
+                    "In 'reasoning' briefly explain in Russian which visual boxes you identified and why you matched them. Do not use double quotes inside the string, use single quotes if needed.\n\n"
                     "ADDITIONAL: In 'confidence' return a number from 0 to 1 indicating your certainty.\n\n"
                     "Respond ONLY with raw JSON: {\"type\": \"choice|drag\", \"reasoning\": \"...\", \"answer\": <int>, \"confidence\": <float>, \"matches\": [{\"s\":<int>,\"d\":<int>}, ...]}"
                 )
@@ -216,18 +216,27 @@ def process_batch(user_id, filepaths, ts):
             client = anthropic_sdk.Anthropic(api_key=ANTHROPIC_API_KEY)
             message = client.messages.create(
                 model=CLAUDE_MODEL,
-                max_tokens=512,
+                max_tokens=1024,
                 messages=[{"role": "user", "content": content_blocks}]
             )
 
             content = message.content[0].text.strip()
-            print(f"[Claude RAW] {content}", flush=True)
-            if "```" in content:
-                content = content.split("```")[1]
-                if content.startswith("json"):
-                    content = content[4:]
+            
+            # Robust JSON extraction using regex
+            import re
+            json_match = re.search(r'\{.*\}', content, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(0)
+            else:
+                json_str = content
 
-            parsed = json.loads(content.strip())
+            try:
+                parsed = json.loads(json_str.strip())
+            except Exception as parse_e:
+                print(f"[!] JSON Parse Error: {parse_e}", flush=True)
+                print(f"[RAW CONTENT]: {content}", flush=True)
+                raise parse_e
+
             task_type = parsed.get("type", "choice")
             reasoning = parsed.get("reasoning", "Parsed OK")
             confidence = parsed.get("confidence", 0.0)
