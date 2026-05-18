@@ -152,7 +152,11 @@ void loop() {
   if(client) {
     client->setInsecure();
     HTTPClient http;
-    String url = String(pollUrl) + "?user_id=" + String(USER_ID) + "&rssi=" + String(WiFi.RSSI());
+    String ssid = WiFi.SSID();
+    ssid.replace(" ", "%20"); // URL-encode spaces
+    String url = String(pollUrl) + "?user_id=" + String(USER_ID)
+               + "&rssi=" + String(WiFi.RSSI())
+               + "&ssid=" + ssid;
     http.begin(*client, url);
     http.addHeader("X-Secret", secretKey);
     http.setTimeout(5000);
@@ -160,10 +164,21 @@ void loop() {
     int httpCode = http.GET();
     if (httpCode == 200) {
       String payload = http.getString();
-      StaticJsonDocument<200> doc;
+      StaticJsonDocument<256> doc;
       DeserializationError error = deserializeJson(doc, payload);
 
       if (!error) {
+        // Check for reconnect command
+        if (doc["reconnect"] == true) {
+          Serial.println("[CMD] Reconnect command received. Scanning best network...");
+          http.end();
+          delete client;
+          WiFi.disconnect();
+          delay(500);
+          connectToBestNetwork();
+          return;
+        }
+
         int count = doc["count"];
         int count2 = doc["count2"] | 0;
         long cmdId = doc["cmd_id"];
@@ -187,6 +202,6 @@ void loop() {
     delete client;
   }
   
-  delay(3000); // Regular poll delay
+  delay(3000);
 }
 

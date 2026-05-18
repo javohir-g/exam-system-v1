@@ -1,370 +1,437 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Node {{ uid }} History | Chat</title>
+    <title>Node {{ uid }} | Transmission Log</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-deep: #05010a;
-            --accent-purple: #7c2dff;
-            --accent-magenta: #ff2d85;
-            --glass: rgba(255, 255, 255, 0.05);
-            --glass-border: rgba(255, 255, 255, 0.1);
-            --text-main: #ffffff;
-            --text-dim: rgba(255, 255, 255, 0.6);
-            --bubble-purple: linear-gradient(135deg, #7c2dff, #ff2d85);
+            --bg:      #0a0a0a;
+            --surface: #111111;
+            --border:  #222222;
+            --border2: #333333;
+            --text:    #ffffff;
+            --dim:     #888888;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger:  #ef4444;
+            --accent:  #7c2dff;
+            --magenta: #ff2d85;
         }
-
-        * {
-            box-sizing: border-box;
-            transition: all 0.2s ease;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
-            background-color: var(--bg-deep);
-            background-image: 
-                radial-gradient(circle at 10% 20%, rgba(124, 45, 255, 0.1) 0%, transparent 40%),
-                radial-gradient(circle at 90% 80%, rgba(255, 45, 133, 0.1) 0%, transparent 40%);
-            background-attachment: fixed;
-            color: var(--text-main);
-            font-family: 'Inter', sans-serif;
-            margin: 0;
-            padding: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', -apple-system, sans-serif;
             min-height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
 
+        /* ── HEADER ── */
         header {
-            background: rgba(10, 5, 20, 0.8);
-            backdrop-filter: blur(20px);
-            border-bottom: 1px solid var(--glass-border);
-            padding: 15px 30px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 16px;
             position: sticky;
             top: 0;
             z-index: 100;
         }
-
-        .header-left {
+        .header-row1 {
             display: flex;
             align-items: center;
-            gap: 20px;
+            gap: 10px;
+            margin-bottom: 10px;
         }
-
-        header h1 {
-            margin: 0;
-            font-family: 'Outfit', sans-serif;
-            font-size: 1.1rem;
-            font-weight: 700;
-            letter-spacing: -0.2px;
-        }
-
-        .back-link {
-            color: var(--text-main);
+        .back-btn {
+            color: var(--dim);
             text-decoration: none;
             font-size: 0.75rem;
-            font-weight: 700;
-            background: var(--glass);
-            border: 1px solid var(--glass-border);
-            padding: 8px 16px;
-            border-radius: 12px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .back-link:hover {
-            background: rgba(255, 255, 255, 0.1);
-            transform: translateX(-5px);
-        }
-
-        .chat-container {
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 40px 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 40px;
-        }
-
-        .message-group {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-
-        /* Bubbles Common */
-        .msg-bubble {
-            max-width: 80%;
-            padding: 16px 20px;
-            border-radius: 20px;
-            position: relative;
-            font-size: 0.95rem;
-            line-height: 1.5;
-        }
-
-        /* Agent (Right) - Image focused */
-        .msg-agent {
-            align-self: flex-end;
-            display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            width: 70%;
-        }
-
-        .screenshot-container {
-            width: 100%;
-            background: var(--glass);
-            border: 1px solid var(--glass-border);
-            border-radius: 24px;
-            padding: 6px;
-            overflow: hidden;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-        }
-
-        .screenshot-container img {
-            width: 100%;
-            display: block;
-            border-radius: 18px;
-        }
-
-        /* AI (Left) - Response bubble */
-        .msg-ai {
-            align-self: flex-start;
-            display: flex;
-            flex-direction: column;
-            align-items: flex-start;
-            width: 80%;
-        }
-
-        .ai-bubble {
-            background: var(--bubble-purple);
-            color: white;
-            border-radius: 24px 24px 24px 6px;
-            box-shadow: 0 10px 25px rgba(124, 45, 255, 0.3);
-            padding: 24px;
-        }
-
-        .msg-meta {
-            font-size: 0.7rem;
-            color: var(--text-dim);
             font-weight: 600;
-            margin-top: 8px;
             text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 5px 10px;
+            border: 1px solid var(--border2);
+            border-radius: 5px;
+            white-space: nowrap;
+        }
+        .back-btn:hover { color: var(--text); border-color: #555; }
+
+        .node-title {
+            font-size: 1rem;
+            font-weight: 700;
             letter-spacing: 0.5px;
         }
 
-        .ai-answer {
-            font-family: 'Outfit', sans-serif;
-            font-weight: 800;
-            font-size: 1.4rem;
-            display: block;
-            margin-bottom: 12px;
-            color: #ffffff;
-            text-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        /* ── NODE INFO BAR ── */
+        .info-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            align-items: center;
         }
 
-        .ai-reasoning {
-            font-size: 0.9rem;
-            color: rgba(255, 255, 255, 0.9);
-            line-height: 1.6;
-            margin: 0;
-        }
-
-        .chat-end {
-            text-align: center;
-            padding: 60px 0;
-            color: var(--text-dim);
-            font-family: 'Outfit', sans-serif;
-            font-size: 0.8rem;
+        .badge {
+            font-size: 0.65rem;
             font-weight: 700;
-            letter-spacing: 3px;
+            padding: 4px 8px;
+            border-radius: 4px;
             text-transform: uppercase;
+            background: #1a1a1a;
+            border: 1px solid var(--border2);
+            letter-spacing: 0.3px;
+        }
+        .badge-on   { color: var(--success); }
+        .badge-off  { color: var(--danger); }
+        .badge-idle { color: var(--dim); }
+        .badge-active { color: var(--success); }
+        .badge-ssid { color: #60a5fa; }
+
+        /* Signal bars */
+        .signal-level {
+            display: flex;
+            align-items: flex-end;
+            gap: 2px;
+            height: 14px;
+            width: 25px;
+            padding: 2px 8px 2px 0;
+        }
+        .signal-bar { flex: 1; background: var(--border2); border-radius: 1px; min-height: 2px; }
+        .bar-1 { height: 20%; } .bar-2 { height: 40%; }
+        .bar-3 { height: 60%; } .bar-4 { height: 80%; }
+        .bar-5 { height: 100%; }
+        .sig-lv-5 .signal-bar { background: var(--success); }
+        .sig-lv-4 .signal-bar:nth-child(-n+4) { background: #a3e635; }
+        .sig-lv-3 .signal-bar:nth-child(-n+3) { background: var(--warning); }
+        .sig-lv-2 .signal-bar:nth-child(-n+2) { background: #f97316; }
+        .sig-lv-1 .signal-bar:nth-child(1)    { background: var(--danger); }
+        .sig-lv-0 .signal-bar { background: var(--border2); }
+
+        /* ── ACTION BAR ── */
+        .action-bar {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+            padding: 10px 16px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+        }
+        .action-label {
+            font-size: 0.7rem;
+            color: var(--dim);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .vibrate-count {
+            width: 48px;
+            background: var(--bg);
+            border: 1px solid var(--border2);
+            color: var(--text);
+            border-radius: 5px;
+            padding: 6px 8px;
+            font-size: 0.85rem;
+            font-family: 'Inter', sans-serif;
+            text-align: center;
+        }
+        .btn {
+            background: #1a1a1a;
+            border: 1px solid var(--border2);
+            color: var(--text);
+            border-radius: 5px;
+            padding: 6px 14px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-family: 'Inter', sans-serif;
+            transition: border-color 0.15s, color 0.15s;
+        }
+        .btn:hover { border-color: #555; color: var(--text); }
+        .btn-vibrate:hover { border-color: var(--accent); color: var(--accent); }
+        .btn-reconnect:hover { border-color: var(--warning); color: var(--warning); }
+        .btn.ok { border-color: var(--success); color: var(--success); }
+
+        /* ── CHAT ── */
+        .chat-feed {
+            flex: 1;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            max-width: 900px;
+            width: 100%;
+            margin: 0 auto;
         }
 
-        @media (max-width: 768px) {
-            .msg-agent, .msg-ai { width: 95%; }
-            .chat-container { padding: 20px; }
+        .entry {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
         }
-    </style>
-</head>
 
-    <style>
-        /* ... existing styles ... */
-        .confidence-container {
+        /* Images block */
+        .imgs-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 6px;
+        }
+        .imgs-grid img {
+            width: 100%;
+            border-radius: 6px;
+            display: block;
+            cursor: zoom-in;
+            border: 1px solid var(--border2);
+        }
+        .upload-wrap {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px;
+        }
+        .entry-meta {
+            font-size: 0.65rem;
+            color: var(--dim);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 0 2px;
+        }
+
+        /* AI bubble */
+        .ai-block {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--accent);
+            border-radius: 8px;
+            padding: 14px 16px;
+        }
+        .ai-answer {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 6px;
+        }
+        .ai-reasoning {
+            font-size: 0.82rem;
+            color: var(--dim);
+            line-height: 1.5;
+        }
+        .confidence-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
             margin-top: 10px;
-            background: rgba(255, 255, 255, 0.05);
-            height: 4px;
+        }
+        .conf-label {
+            font-size: 0.65rem;
+            font-weight: 700;
+            color: var(--dim);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+        .conf-track {
+            flex: 1;
+            height: 3px;
+            background: var(--border2);
             border-radius: 2px;
             overflow: hidden;
         }
-        .confidence-bar {
+        .conf-fill {
             height: 100%;
-            background: var(--accent-magenta);
-            width: 0%;
+            background: var(--accent);
+            border-radius: 2px;
         }
-        .vibrate-controls {
-            display: flex;
-            gap: 10px;
-            align-items: center;
+        .conf-pct {
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: var(--dim);
+            min-width: 30px;
+            text-align: right;
         }
-        .vibrate-input {
-            width: 50px;
-            background: var(--glass);
-            border: 1px solid var(--glass-border);
-            color: white;
-            border-radius: 8px;
-            padding: 8px;
+
+        /* Empty */
+        .empty {
             text-align: center;
-            font-family: 'Outfit', sans-serif;
-            font-weight: 700;
-        }
-        .vibrate-btn {
-            background: var(--bubble-purple);
-            border: none;
-            color: white;
-            padding: 8px 15px;
-            border-radius: 12px;
-            cursor: pointer;
-            font-weight: 700;
+            padding: 60px 0;
+            color: var(--dim);
             font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 2px;
         }
-        .vibrate-btn:active { transform: scale(0.95); }
-        
+
         /* Lightbox */
-        #lightbox {
+        #lb {
             display: none;
             position: fixed;
             inset: 0;
-            background: rgba(0,0,0,0.9);
+            background: rgba(0,0,0,0.92);
             z-index: 2000;
-            padding: 40px;
             cursor: zoom-out;
-            justify-content: center;
             align-items: center;
+            justify-content: center;
+            padding: 20px;
         }
-        #lightbox img {
-            max-width: 95%;
-            max-height: 95%;
-            object-fit: contain;
-            border-radius: 10px;
-        }
-        
-        .multi-photo-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 10px;
+        #lb.open { display: flex; }
+        #lb img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 6px; }
+
+        /* Mobile */
+        @media (max-width: 600px) {
+            .node-title { font-size: 0.9rem; }
+            .action-bar { gap: 6px; }
+            .chat-feed { padding: 10px; gap: 16px; }
+            .imgs-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
-
 <body>
-    <div id="lightbox" onclick="this.style.display='none'">
-        <img src="" id="lightbox-img">
+
+<div id="lb" onclick="closeLb()"><img id="lb-img" src=""></div>
+
+<!-- HEADER -->
+<header>
+    <div class="header-row1">
+        <a href="/dashboard" class="back-btn">← Back</a>
+        <span class="node-title">NODE {{ "%02d"|format(uid|int) }}</span>
     </div>
-    <header>
-        <div class="header-left">
-            <a href="/dashboard" class="back-link">← CONSOLE</a>
-            <h1>NODE {{ uid }} :: LIVE TRANSMISSION</h1>
-        </div>
-        <div class="vibrate-controls">
-            <input type="number" id="vibrate-count" class="vibrate-input" value="1" min="1" max="9">
-            <button onclick="sendVibrate()" class="vibrate-btn">VIBRATE</button>
-        </div>
-    </header>
 
-    <div class="chat-container" id="chat-box">
-        {% for entry in history %}
-        <div class="message-group">
-            <!-- AGENT MESSAGE (Outgoing) -->
-            <div class="msg-agent">
-                <div class="screenshot-container">
-                    <div class="multi-photo-grid">
-                        {% if entry.filenames %}
-                            {% for fname in entry.filenames %}
-                            <img src="/screenshots/{{ fname }}" onclick="openImage(this.src)" style="cursor: zoom-in;">
-                            {% endfor %}
-                        {% else %}
-                            <img src="/screenshots/{{ entry.filename }}" onclick="openImage(this.src)" style="cursor: zoom-in;">
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="msg-meta">AGENT UPLOAD • {{ entry.timestamp }}</div>
-            </div>
+    {% set node = users[uid] if users is defined and uid in users else {} %}
+    {% set r = node.rssi|int if node.rssi else 0 %}
+    {% set lv = 5 if r < 0 and r > -60 else 4 if r < 0 and r > -70 else 3 if r < 0 and r > -80 else 2 if r < 0 and r > -90 else 1 if r < 0 else 0 %}
 
-            <!-- AI MESSAGE (Incoming) -->
-            <div class="msg-ai">
-                <div class="ai-bubble">
-                    <span class="ai-answer">RECOMMENDED: {{ entry.answer if entry.answer else "UNDEFINED" }}</span>
-                    <p class="ai-reasoning">{{ entry.reasoning }}</p>
-                    
-                    {% if entry.confidence is defined %}
-                    <div class="msg-meta">CONFIDENCE: {{ (entry.confidence * 100)|round|int }}%</div>
-                    <div class="confidence-container">
-                        <div class="confidence-bar" style="width: {{ entry.confidence * 100 }}%"></div>
-                    </div>
-                    {% endif %}
-                </div>
-                <div class="msg-meta">AI ANALYSIS • DONE</div>
-            </div>
+    <div class="info-bar">
+        <div class="signal-level sig-lv-{{ lv }}" title="{{ r }} dBm">
+            <div class="signal-bar bar-1"></div>
+            <div class="signal-bar bar-2"></div>
+            <div class="signal-bar bar-3"></div>
+            <div class="signal-bar bar-4"></div>
+            <div class="signal-bar bar-5"></div>
         </div>
-        {% endfor %}
 
-        {% if not history %}
-        <div class="chat-end">WAITING FOR DATA PACKETS...</div>
+        {% if node.ssid %}
+        <div class="badge badge-ssid">📡 {{ node.ssid }}</div>
+        {% endif %}
+
+        {% if node.esp_online %}
+        <div class="badge badge-on">● ESP ONLINE</div>
         {% else %}
-        <div class="chat-end">TRANSMISSION LOGS END</div>
+        <div class="badge badge-off">● ESP OFFLINE</div>
+        {% endif %}
+
+        <div class="badge {{ 'badge-active' if history else 'badge-idle' }}">
+            {{ 'STREAMING' if history else 'IDLE' }}
+        </div>
+
+        {% if node.last_seen and node.last_seen != 'Never' %}
+        <div class="badge">{{ node.last_seen }}</div>
         {% endif %}
     </div>
+</header>
 
-    <script>
-        function openImage(src) {
-            document.getElementById('lightbox-img').src = src;
-            document.getElementById('lightbox').style.display = 'flex';
-        }
+<!-- ACTION BAR -->
+<div class="action-bar">
+    <span class="action-label">Vibrate</span>
+    <input type="number" id="vcount" class="vibrate-count" value="1" min="1" max="9">
+    <button class="btn btn-vibrate" id="vbtn" onclick="sendVibrate()">VIBRATE</button>
+    <button class="btn btn-reconnect" id="rbtn" onclick="sendReconnect()">↺ RSCAN</button>
+</div>
 
-        function sendVibrate() {
-            const count = document.getElementById('vibrate-count').value;
-            fetch('/vibrate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    user_id: "{{ uid }}",
-                    count: parseInt(count),
-                    secret: "super-secret-key"
-                })
-            }).then(r => {
-                if(r.ok) {
-                    const btn = document.querySelector('.vibrate-btn');
-                    btn.innerText = 'SENT ✓';
-                    setTimeout(() => btn.innerText = 'VIBRATE', 1000);
-                }
-            });
-        }
+<!-- CHAT FEED -->
+<div class="chat-feed" id="chat-box">
+    {% for entry in history %}
+    <div class="entry">
+        <!-- Images -->
+        <div class="upload-wrap">
+            <div class="imgs-grid">
+                {% if entry.filenames %}
+                    {% for fname in entry.filenames %}
+                    <img src="/screenshots/{{ fname }}" onclick="openLb(this.src)" loading="lazy">
+                    {% endfor %}
+                {% elif entry.filename %}
+                    <img src="/screenshots/{{ entry.filename }}" onclick="openLb(this.src)" loading="lazy">
+                {% endif %}
+            </div>
+        </div>
+        <div class="entry-meta">📤 {{ entry.timestamp }}</div>
 
-        // Live Mode Auto-refresh
-        let lastHistoryCount = {{ history|length }};
-        setInterval(() => {
-            fetch(window.location.href).then(r => r.text()).then(html => {
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(html, 'text/html');
-                const newChat = doc.getElementById('chat-box');
-                const newItems = doc.querySelectorAll('.message-group');
-                
-                if (newItems.length > lastHistoryCount) {
-                    document.getElementById('chat-box').innerHTML = newChat.innerHTML;
-                    lastHistoryCount = newItems.length;
-                    // Auto-scroll to bottom
-                    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-                }
-            });
-        }, 3000);
-    </script>
+        <!-- AI response -->
+        <div class="ai-block">
+            <div class="ai-answer">→ {{ entry.answer if entry.answer else '—' }}</div>
+            {% if entry.reasoning %}
+            <div class="ai-reasoning">{{ entry.reasoning }}</div>
+            {% endif %}
+            {% if entry.confidence is defined %}
+            <div class="confidence-row">
+                <span class="conf-label">Confidence</span>
+                <div class="conf-track"><div class="conf-fill" style="width:{{ (entry.confidence * 100)|round|int }}%"></div></div>
+                <span class="conf-pct">{{ (entry.confidence * 100)|round|int }}%</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+
+    {% if not history %}
+    <div class="empty">Waiting for data packets…</div>
+    {% endif %}
+</div>
+
+<script>
+    const UID = "{{ uid }}";
+    const SECRET = "super-secret-key";
+
+    function openLb(src) {
+        document.getElementById('lb-img').src = src;
+        document.getElementById('lb').classList.add('open');
+    }
+    function closeLb() { document.getElementById('lb').classList.remove('open'); }
+
+    function flashBtn(id, msg, cls) {
+        const b = document.getElementById(id);
+        const orig = b.textContent;
+        b.textContent = msg;
+        b.classList.add(cls || 'ok');
+        setTimeout(() => { b.textContent = orig; b.classList.remove(cls || 'ok'); }, 1500);
+    }
+
+    function sendVibrate() {
+        const count = document.getElementById('vcount').value;
+        fetch('/vibrate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: UID, count: parseInt(count), secret: SECRET })
+        }).then(r => flashBtn('vbtn', r.ok ? 'SENT ✓' : 'ERR ✗'));
+    }
+
+    function sendReconnect() {
+        fetch('/reconnect', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: UID, secret: SECRET })
+        }).then(r => flashBtn('rbtn', r.ok ? 'QUEUED ✓' : 'ERR ✗'));
+    }
+
+    // Live update every 3s
+    let countBefore = {{ history|length }};
+    setInterval(() => {
+        fetch(window.location.href).then(r => r.text()).then(html => {
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const newBox = doc.getElementById('chat-box');
+            const newCount = doc.querySelectorAll('.entry').length;
+            if (newCount > countBefore) {
+                document.getElementById('chat-box').innerHTML = newBox.innerHTML;
+                countBefore = newCount;
+                window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+            }
+        });
+    }, 3000);
+</script>
 </body>
-
 </html>

@@ -194,6 +194,20 @@
             color: var(--accent-magenta);
         }
 
+        .reconnect-btn {
+            background: none;
+            border: 1px solid #333;
+            color: var(--text-dim);
+            border-radius: 6px;
+            padding: 2px 7px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            line-height: 1;
+            transition: all 0.15s;
+        }
+        .reconnect-btn:hover { border-color: var(--warning); color: var(--warning); }
+        .reconnect-btn.sent { border-color: var(--success); color: var(--success); }
+
         @media (max-width: 600px) {
             .container { padding: 15px; }
             .grid { grid-template-columns: 1fr; }
@@ -238,7 +252,7 @@
                             {{ 'STREAM' if data.history else 'IDLE' }}
                         </div>
                         {% if data.esp_online %}
-                        <div class="badge badge-esp">ESP</div>
+                        <div class="badge badge-esp" title="{{ data.ssid or 'Unknown' }}">📡 {{ data.ssid or 'ESP' }}</div>
                         {% else %}
                         <div class="badge badge-offline">OFF</div>
                         {% endif %}
@@ -254,6 +268,9 @@
                 <div class="card-footer">
                     <div class="footer-top">
                         <div class="timestamp">{{ data.last_seen if data.last_seen != "Never" else "Disconnected" }}</div>
+                        {% if data.esp_online %}
+                        <button class="reconnect-btn" onclick="event.preventDefault(); reconnectNode('{{ uid }}')">↺</button>
+                        {% endif %}
                         {% if data.history %}
                         {% set last = data.history[-1] %}
                         <div class="result">{{ last.answer if last.answer else "..." }}</div>

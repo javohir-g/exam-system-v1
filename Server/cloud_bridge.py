@@ -26,6 +26,7 @@ DB_FILE = "database.json"
 # --- MULTI-USER STATE ---
 user_data = {}
 answer_queue = {}
+reconnect_queue = {}  # user_id -> True
 heartbeats = {}  # user_id -> last_seen_timestamp
 
 # --- PHOTO BUFFER (3-second server-side batching) ---
@@ -138,6 +139,7 @@ def poll():
     
     user_id = request.args.get("user_id")
     rssi = request.args.get("rssi")
+    ssid = request.args.get("ssid", "").replace("%20", " ")
     if not user_id:
         return "Missing user_id", 400
     
@@ -151,6 +153,13 @@ def poll():
     user_data[uid]["last_seen"] = time.strftime("%H:%M:%S")
     if rssi:
         user_data[uid]["rssi"] = int(rssi)
+    if ssid:
+        user_data[uid]["ssid"] = ssid
+
+    # Check for pending reconnect command
+    if reconnect_queue.pop(uid, None):
+        print(f"[*] Sending reconnect command to Node {uid}", flush=True)
+        return jsonify({"count": 0, "count2": 0, "cmd_id": 0, "reconnect": True}), 200
     
     # answer_queue[user_id] is now a list
     queue = answer_queue.get(user_id, [])
@@ -313,6 +322,18 @@ def process_batch(user_id, filepaths, ts):
     send_to_telegram(user_id, filepaths, tg_answer, reasoning)
     save_data()
 
+@app.route("/reconnect", methods=["POST"])
+def reconnect_node():
+    """Queue a reconnect command for the specified node."""
+    data = request.json or {}
+    if SECRET_KEY and data.get("secret") != SECRET_KEY:
+        if request.headers.get("X-Secret") != SECRET_KEY:
+            return "Unauthorized", 401
+    user_id = str(data.get("user_id"))
+    reconnect_queue[user_id] = True
+    print(f"[*] Reconnect queued for Node {user_id}", flush=True)
+    return jsonify({"status": "queued"}), 200
+
 @app.route("/vibrate", methods=["POST"])
 def vibrate():
     """Manually add a vibration command to the queue."""
@@ -416,8 +437,11 @@ def dashboard():
 
 @app.route("/user/<user_id>")
 def user_history(user_id):
-    data = user_data.get(user_id, {"history": [], "last_seen": "Never", "last_img": None})
-    return render_template("user_history.html", uid=user_id, history=data["history"], last_img=data.get("last_img"))
+    now = time.time()
+    data = user_data.get(user_id, {"history": [], "last_seen": "Never", "last_img": None}).copy()
+    data["esp_online"] = (now - heartbeats.get(user_id, 0)) < 12
+    # Pass as 'users' dict so template can use users[uid]
+    return render_template("user_history.html", uid=user_id, history=data.get("history", []), users={user_id: data})
 
 @app.route("/screenshots/<path:filename>")
 def serve_screenshot(filename):
