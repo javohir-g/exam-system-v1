@@ -4,12 +4,12 @@
 #include <WiFi.h>
 
 // --- KNOWN NETWORKS ---
-struct Network {
+struct KnownAP {
   const char* ssid;
   const char* password;
 };
 
-Network knownNetworks[] = {
+KnownAP knownNetworks[] = {
   { "HomeWifi",   "11223344" },
   { "Android",    "11223344" },
   { "#Turin.uz",  "Turin_2024@!" },
