@@ -102,6 +102,15 @@ void vibrate(int times) {
   Serial.println("--- VIBRATION DONE ---");
 }
 
+void vibrateZero() {
+  Serial.println("--- ZERO VIBRATION (LONG) ---");
+  digitalWrite(MOTOR_PIN, HIGH);
+  delay(1500); // 1.5 seconds for a zero
+  digitalWrite(MOTOR_PIN, LOW);
+  delay(500);
+  Serial.println("--- ZERO DONE ---");
+}
+
 void vibrateDrag(int from, int to) {
   Serial.println("--- DRAG VIBRATION START ---");
   Serial.print("FROM: "); Serial.println(from);
@@ -181,12 +190,22 @@ void loop() {
 
         int count = doc["count"];
         int count2 = doc["count2"] | 0;
+        bool isNum = doc["is_num"] | false;
         long cmdId = doc["cmd_id"];
 
-        if (count > 0 && cmdId != lastCommandId) {
+        if ((count > 0 || isNum) && cmdId != lastCommandId) {
           lastCommandId = cmdId;
           sendDebugReport(count, cmdId, "vibrating");
-          if (count2 > 0) {
+          
+          if (isNum) {
+            String s = String(count);
+            for(int i = 0; i < s.length(); i++) {
+              int d = s.charAt(i) - '0';
+              if (d == 0) vibrateZero();
+              else vibrate(d);
+              if (i < s.length() - 1) delay(2000); // 2 sec pause between digits
+            }
+          } else if (count2 > 0) {
             vibrateDrag(count, count2);
           } else {
             vibrate(count);

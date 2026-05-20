@@ -234,17 +234,18 @@ def process_batch(user_id, filepaths, ts):
                     prompt_prefix +
                     "TASK TYPE DETECTION:\n"
                     "- If this is a MULTIPLE CHOICE question (options A/B/C/D/E/F): return type 'choice'\n"
-                    "- If this is a DRAG & DROP task (matching items, sorting, or filling code/text gaps): return type 'drag'\n\n"
-                    "FOR CHOICE: In 'answer' put the index: 1=A, 2=B, 3=C, 4=D, 5=E, 6=F.\n\n"
-                    "FOR DRAG & DROP (Filling gaps/Matching):\n"
+                    "- If this is a DRAG & DROP task (matching items, sorting, or filling gaps): return type 'drag'\n"
+                    "- If this requires a NUMERIC OPEN ANSWER (e.g., math answer '235'): return type 'number'\n\n"
+                    "FOR CHOICE: In 'answer' put the index: 1=A, 2=B, 3=C, 4=D, 5=E... \n\n"
+                    "FOR DRAG & DROP:\n"
                     "1. Identify ALL empty boxes/slots. Number them 1, 2, 3... strictly from TOP-TO-BOTTOM.\n"
                     "2. Identify ALL source buttons. Number them 1, 2, 3... strictly from LEFT-TO-RIGHT.\n"
-                    "3. In 'matches' return a list for EVERY identified slot. YOU MUST NOT SKIP ANY SLOT NUMBER.\n"
-                    "   If a slot cannot be filled by the provided buttons, set its 's' to 0.\n"
-                    "   Output format: [{\"s\": button_idx, \"d\": 1}, {\"s\": button_idx, \"d\": 2}, ...]\n\n"
+                    "3. In 'matches' return a list for EVERY slot. If a slot can't be filled, set 's' to 0.\n"
+                    "   Format: [{\"s\": button_idx, \"d\": 1}, ...]\n\n"
+                    "FOR NUMBER: In 'answer' put the integer value directly (e.g. 235).\n\n"
                     "In 'reasoning' provide an extremely brief note (1-3 words) in Russian.\n\n"
                     "ADDITIONAL: In 'confidence' return a number from 0 to 1 indicating your certainty.\n\n"
-                    "Respond ONLY with raw JSON: {\"type\": \"choice|drag\", \"reasoning\": \"...\", \"answer\": <int>, \"confidence\": <float>, \"matches\": [{\"s\":<int>,\"d\":<int>}, ...]}"
+                    "Respond ONLY with raw JSON: {\"type\": \"choice|drag|number\", \"reasoning\": \"...\", \"answer\": <int>, \"confidence\": <float>, \"matches\": [{\"s\":<int>,\"d\":<int>}, ...]}"
                 )
             })
 
@@ -289,6 +290,10 @@ def process_batch(user_id, filepaths, ts):
                     user_queue.append({"count": m.get("s", 0), "count2": 0, "cmd_id": ts + i})
                 
                 tg_answer = "\n".join([f"{m.get('d')}) {m.get('s')}" for m in sorted_matches])
+            elif task_type == "number":
+                answer_val = parsed.get("answer", 0)
+                user_queue.append({"count": answer_val, "count2": 0, "cmd_id": ts, "is_num": True})
+                tg_answer = str(answer_val)
             else:
                 answer_val = parsed.get("answer", 0)
                 user_queue.append({"count": answer_val, "count2": 0, "cmd_id": ts})
