@@ -6,7 +6,7 @@ import traceback
 import json
 import base64
 from datetime import datetime
-from flask import Flask, request, jsonify, render_template, send_from_directory, send_file
+from flask import Flask, request, jsonify, render_template, send_from_directory
 from dotenv import load_dotenv
 
 # Load local .env variables
@@ -20,10 +20,6 @@ SCREENSHOT_DIR = "screenshots"
 
 if not os.path.exists(SCREENSHOT_DIR):
     os.makedirs(SCREENSHOT_DIR)
-
-FIRMWARE_DIR = "firmware"
-if not os.path.exists(FIRMWARE_DIR):
-    os.makedirs(FIRMWARE_DIR)
 
 DB_FILE = "database.json"
 
@@ -133,18 +129,6 @@ def ping():
             user_data[user_id]["rssi"] = int(rssi)
     return jsonify({"status": "alive"}), 200
 
-@app.route("/firmware.bin", methods=["GET"])
-def serve_firmware():
-    """Serves the latest compiled firmware binary for OTA."""
-    return send_file(os.path.join(FIRMWARE_DIR, "esp32_vibro.ino.bin"), mimetype="application/octet-stream")
-
-def get_ota_version():
-    try:
-        with open(os.path.join(FIRMWARE_DIR, "ota_version.txt"), "r") as f:
-            return int(f.read().strip())
-    except:
-        return 0
-
 @app.route("/poll", methods=["GET"])
 def poll():
     """ESP32 calls this to get pending answers. Pops the first command from the user's queue."""
@@ -172,17 +156,10 @@ def poll():
     if ssid:
         user_data[uid]["ssid"] = ssid
 
-    ota_info = {
-        "ota_version": get_ota_version(),
-        "ota_url": "https://exam-system-v1.onrender.com/firmware.bin"
-    }
-
     # Check for pending reconnect command
     if reconnect_queue.pop(uid, None):
         print(f"[*] Sending reconnect command to Node {uid}", flush=True)
-        resp = {"count": 0, "count2": 0, "cmd_id": 0, "reconnect": True}
-        resp.update(ota_info)
-        return jsonify(resp), 200
+        return jsonify({"count": 0, "count2": 0, "cmd_id": 0, "reconnect": True}), 200
     
     # answer_queue[user_id] is now a list
     queue = answer_queue.get(user_id, [])
@@ -194,19 +171,14 @@ def poll():
         data = queue.pop(0)
         count = data.get("count", 0)
         count2 = data.get("count2", 0)
-        is_num = data.get("is_num", False)
         cmd_id = data.get("cmd_id", 0)
         
         answer_queue[user_id] = queue
         save_data()
         print(f"[*] Polled User {user_id}: {count}/{count2} (Remaining: {len(queue)})", flush=True)
-        resp = {"count": count, "count2": count2, "cmd_id": cmd_id, "is_num": is_num}
-        resp.update(ota_info)
-        return jsonify(resp), 200
+        return jsonify({"count": count, "count2": count2, "cmd_id": cmd_id}), 200
     
-    resp = {"count": 0, "count2": 0, "cmd_id": 0}
-    resp.update(ota_info)
-    return jsonify(resp), 200
+    return jsonify({"count": 0, "count2": 0, "cmd_id": 0}), 200
 
 @app.route("/esp_report", methods=["POST"])
 def esp_report():

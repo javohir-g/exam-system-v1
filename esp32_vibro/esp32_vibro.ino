@@ -2,9 +2,6 @@
 #include <ArduinoJson.h>
 #include <WiFiClientSecure.h>
 #include <WiFi.h>
-#include <HTTPUpdate.h>
-
-const int CURRENT_VERSION = 1;
 
 // --- KNOWN NETWORKS ---
 struct KnownAP {
@@ -180,28 +177,6 @@ void loop() {
       DeserializationError error = deserializeJson(doc, payload);
 
       if (!error) {
-        // Check for OTA update
-        if (doc.containsKey("ota_version") && doc["ota_version"] > CURRENT_VERSION) {
-            String ota_url = doc["ota_url"];
-            Serial.printf("[OTA] New firmware v%d found! Downlading from %s\n", (int)doc["ota_version"], ota_url.c_str());
-            http.end(); // close current connection
-            
-            t_httpUpdate_return ret = httpUpdate.update(*client, ota_url);
-            switch (ret) {
-                case HTTP_UPDATE_FAILED:
-                    Serial.printf("[OTA] Update failed. Error (%d): %s\n", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
-                    break;
-                case HTTP_UPDATE_NO_UPDATES:
-                    Serial.println("[OTA] No updates");
-                    break;
-                case HTTP_UPDATE_OK:
-                    Serial.println("[OTA] Update OK! Rebooting...");
-                    break;
-            }
-            delete client;
-            return;
-        }
-
         // Check for reconnect command
         if (doc["reconnect"] == true) {
           Serial.println("[CMD] Reconnect command received. Scanning best network...");
