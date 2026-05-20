@@ -85,12 +85,13 @@ def send_to_telegram(user_id, filepaths, answer_text, reasoning):
         if len(filepaths) == 1:
             # Single photo
             with open(filepaths[0], "rb") as photo:
-                requests.post(
+                r = requests.post(
                     f"https://api.telegram.org/bot{token}/sendPhoto",
                     data={"chat_id": chat_id, "caption": caption, "parse_mode": "Markdown"},
                     files={"photo": photo},
                     timeout=15
                 )
+                print(f"[TG] Single photo status: {r.status_code}, Response: {r.text}", flush=True)
         else:
             # Multiple photos — send as media group
             media = []
@@ -103,12 +104,13 @@ def send_to_telegram(user_id, filepaths, answer_text, reasoning):
                     item["caption"] = caption
                     item["parse_mode"] = "Markdown"
                 media.append(item)
-            requests.post(
+            r = requests.post(
                 f"https://api.telegram.org/bot{token}/sendMediaGroup",
                 data={"chat_id": chat_id, "media": json.dumps(media)},
                 files=files,
                 timeout=30
             )
+            print(f"[TG] Media group status: {r.status_code}, Response: {r.text}", flush=True)
             for f in files.values():
                 f.close()
 
