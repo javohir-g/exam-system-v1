@@ -69,14 +69,16 @@ def send_to_telegram(user_id, filepaths, answer_text, reasoning):
         return
     
     try:
-        # Build mention string
-        tg_mention = tg_users.get(str(user_id), "")
-        mention_line = f"\n👤 {tg_mention}" if tg_mention else ""
+        # Escape underscores for Telegram Markdown (common cause of 400 Bad Request)
+        tg_mention_escaped = tg_users.get(str(user_id), "").replace("_", "\\_")
+        mention_line = f"\n👤 {tg_mention_escaped}" if tg_mention_escaped else ""
+        
+        reasoning_escaped = reasoning.replace("_", "\\_")
         
         caption = (
             f"📡 *NODE {user_id}*{mention_line}\n"
             f"✅ *Answer:* `{answer_text}`\n"
-            f"🧠 *Reasoning:* {reasoning}"
+            f"🧠 *Reasoning:* {reasoning_escaped}"
         )
 
         if isinstance(filepaths, str):
