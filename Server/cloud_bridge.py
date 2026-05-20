@@ -28,6 +28,7 @@ user_data = {}
 answer_queue = {}
 reconnect_queue = {}  # user_id -> True
 heartbeats = {}  # user_id -> last_seen_timestamp
+tg_users = {}  # user_id -> "@username" or "123456789" (Telegram user)
 
 # --- PHOTO BUFFER (3-second server-side batching) ---
 # {user_id: {"files": [...], "timer": threading.Timer}}
@@ -41,6 +42,7 @@ def load_data():
                 db = json.load(f)
                 user_data = db.get("user_data", {})
                 answer_queue = db.get("answer_queue", {})
+                tg_users.update(db.get("tg_users", {}))
                 print(f"[*] Data loaded from {DB_FILE}", flush=True)
         except Exception as e:
             print(f"[!] Error loading {DB_FILE}: {e}", flush=True)
@@ -50,7 +52,8 @@ def save_data():
         with open(DB_FILE, "w") as f:
             json.dump({
                 "user_data": user_data,
-                "answer_queue": answer_queue
+                "answer_queue": answer_queue,
+                "tg_users": tg_users
             }, f, indent=4)
     except Exception as e:
         print(f"[!] Error saving {DB_FILE}: {e}", flush=True)
@@ -66,8 +69,12 @@ def send_to_telegram(user_id, filepaths, answer_text, reasoning):
         return
     
     try:
+        # Build mention string
+        tg_mention = tg_users.get(str(user_id), "")
+        mention_line = f"\n👤 {tg_mention}" if tg_mention else ""
+        
         caption = (
-            f"📡 *NODE {user_id}*\n"
+            f"📡 *NODE {user_id}*{mention_line}\n"
             f"✅ *Answer:* `{answer_text}`\n"
             f"🧠 *Reasoning:* {reasoning}"
         )
@@ -361,6 +368,31 @@ def vibrate():
     print(f"[*] Manual Vibrate: User {user_id} (count={count})", flush=True)
     return jsonify({"status": "queued"}), 200
 
+
+@app.route("/set_tg_user", methods=["POST"])
+def set_tg_user():
+    """Map a node ID to a Telegram username or user ID for group mentions."""
+    data = request.json or {}
+    if SECRET_KEY and data.get("secret") != SECRET_KEY:
+        if request.headers.get("X-Secret") != SECRET_KEY:
+            return "Unauthorized", 401
+    node_id = str(data.get("node_id", ""))
+    tg_user = str(data.get("tg_user", "")).strip()
+    if not node_id:
+        return jsonify({"error": "Missing node_id"}), 400
+    if tg_user:
+        tg_users[node_id] = tg_user
+    else:
+        tg_users.pop(node_id, None)  # clear mapping if empty
+    save_data()
+    print(f"[*] TG user for Node {node_id} set to: {tg_user!r}", flush=True)
+    return jsonify({"status": "ok", "node_id": node_id, "tg_user": tg_user}), 200
+
+
+@app.route("/tg_users", methods=["GET"])
+def get_tg_users():
+    """Return current node -> Telegram user mapping."""
+    return jsonify(tg_users), 200
 
 
 @app.route("/upload", methods=["POST"])

@@ -278,6 +278,47 @@
             transform: rotate(0deg);
         }
 
+        .tg-badge {
+            font-size: 0.65rem;
+            font-weight: 700;
+            color: #60a5fa;
+            border-color: rgba(96,165,250,0.3);
+            background: rgba(96,165,250,0.1);
+        }
+
+        .tg-form {
+            display: none;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            border-top: 1px solid var(--glass-border);
+            background: rgba(0,0,0,0.15);
+        }
+        .tg-form input {
+            flex: 1;
+            background: rgba(0,0,0,0.4);
+            border: 1px solid var(--glass-border);
+            color: var(--text-main);
+            border-radius: 6px;
+            padding: 5px 10px;
+            font-size: 0.8rem;
+            font-family: 'Inter', sans-serif;
+            outline: none;
+        }
+        .tg-form input:focus { border-color: #60a5fa; }
+        .tg-form button {
+            background: rgba(96,165,250,0.1);
+            border: 1px solid rgba(96,165,250,0.4);
+            color: #60a5fa;
+            border-radius: 6px;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: 700;
+            font-family: 'Inter', sans-serif;
+        }
+        .tg-form button:hover { background: rgba(96,165,250,0.2); }
+
         @media (max-width: 768px) {
             .container { padding: 20px; }
             .grid { grid-template-columns: 1fr; }
@@ -285,6 +326,63 @@
         }
     </style>
     <script>
+        const SECRET = 'super-secret-key';
+        let tgMap = {};
+
+        function loadTgUsers() {
+            fetch('/tg_users').then(r => r.json()).then(data => {
+                tgMap = data;
+                updateTgBadges();
+            });
+        }
+
+        function updateTgBadges() {
+            document.querySelectorAll('[data-uid]').forEach(el => {
+                const uid = el.dataset.uid;
+                const badge = el.querySelector('.tg-badge');
+                badge.textContent = tgMap[uid] ? ('👤 ' + tgMap[uid]) : '';
+                badge.style.display = tgMap[uid] ? 'flex' : 'none';
+            });
+        }
+
+        function toggleTgForm(uid, event) {
+            event.preventDefault();
+            event.stopPropagation();
+            const form = document.getElementById('tg-form-' + uid);
+            const input = document.getElementById('tg-input-' + uid);
+            form.style.display = form.style.display === 'flex' ? 'none' : 'flex';
+            if (form.style.display === 'flex') {
+                input.value = tgMap[uid] || '';
+                input.focus();
+            }
+        }
+
+        function setTgUser(uid, event) {
+            event.preventDefault();
+            event.stopPropagation();
+            const tg = document.getElementById('tg-input-' + uid).value.trim();
+            fetch('/set_tg_user', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ node_id: uid, tg_user: tg, secret: SECRET })
+            }).then(r => r.json()).then(() => {
+                tgMap[uid] = tg;
+                updateTgBadges();
+                document.getElementById('tg-form-' + uid).style.display = 'none';
+            });
+        }
+
+        function reconnectNode(uid, event) {
+            event.preventDefault();
+            event.stopPropagation();
+            fetch('/reconnect', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: uid, secret: SECRET })
+            });
+        }
+
+        loadTgUsers();
         setInterval(() => {
             fetch('/dashboard').then(r => r.text()).then(html => {
                 const parser = new DOMParser();
@@ -292,6 +390,7 @@
                 const newGrid = doc.querySelector('.grid');
                 if (newGrid) {
                     document.querySelector('.grid').innerHTML = newGrid.innerHTML;
+                    updateTgBadges();
                 }
             });
         }, 2000);
@@ -306,10 +405,11 @@
     <div class="container">
         <div class="grid">
             {% for uid, data in users.items() %}
-            <a href="/user/{{ uid }}" class="card">
+            <a href="/user/{{ uid }}" class="card" data-uid="{{ uid }}">
                 <div class="card-header">
                     <div class="node-id">NODE {{ "%02d"|format(uid|int) }}</div>
-                    <div class="badges">
+                    <div class="badges" style="align-items:center;">
+                        <span class="badge tg-badge" style="display:none;"></span>
                         {% set r = data.rssi|int if data.rssi else 0 %}
                         {% set lv = 0 if not data.esp_online else (5 if r < 0 and r > -60 else 4 if r < 0 and r > -70 else 3 if r < 0 and r > -80 else 2 if r < 0 and r > -90 else 1 if r < 0 else 0) %}
                         <div class="signal-level sig-lv-{{ lv }}" title="{{ r if data.esp_online else '---' }} dBm">
@@ -344,9 +444,16 @@
                         <div class="result">{{ last.answer if last.answer else "..." }}</div>
                         {% endif %}
                     </div>
-                    {% if data.esp_online %}
-                    <button class="reconnect-btn" onclick="event.preventDefault(); reconnectNode('{{ uid }}')">↺</button>
-                    {% endif %}
+                    <div style="display:flex;gap:6px;">
+                        {% if data.esp_online %}
+                        <button class="reconnect-btn" onclick="reconnectNode('{{ uid }}', event)">↺</button>
+                        {% endif %}
+                        <button class="reconnect-btn" onclick="toggleTgForm('{{ uid }}', event)" title="Set Telegram user">👤</button>
+                    </div>
+                </div>
+                <div class="tg-form" id="tg-form-{{ uid }}">
+                    <input id="tg-input-{{ uid }}" type="text" placeholder="@username or Telegram ID" onkeydown="if(event.key==='Enter'){setTgUser('{{ uid }}',event)}" onclick="event.stopPropagation()">
+                    <button onclick="setTgUser('{{ uid }}', event)">✓</button>
                 </div>
             </a>
             {% endfor %}
