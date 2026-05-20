@@ -384,6 +384,15 @@
 
         loadTgUsers();
         setInterval(() => {
+            // Save state of any open tg forms before refresh
+            const openForms = {};
+            document.querySelectorAll('.tg-form').forEach(form => {
+                if (form.style.display === 'flex') {
+                    const uid = form.id.replace('tg-form-', '');
+                    openForms[uid] = document.getElementById('tg-input-' + uid)?.value || '';
+                }
+            });
+
             fetch('/dashboard').then(r => r.text()).then(html => {
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(html, 'text/html');
@@ -391,6 +400,16 @@
                 if (newGrid) {
                     document.querySelector('.grid').innerHTML = newGrid.innerHTML;
                     updateTgBadges();
+                    // Restore open forms
+                    for (const [uid, val] of Object.entries(openForms)) {
+                        const form = document.getElementById('tg-form-' + uid);
+                        const input = document.getElementById('tg-input-' + uid);
+                        if (form && input) {
+                            form.style.display = 'flex';
+                            input.value = val;
+                            input.focus();
+                        }
+                    }
                 }
             });
         }, 2000);
