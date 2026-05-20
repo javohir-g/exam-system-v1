@@ -13,6 +13,9 @@ KnownAP knownNetworks[] = {
   { "HomeWifi",   "11223344" },
   { "Android",    "11223344" },
   { "#Turin.uz",  "Turin_2024@!" },
+  { "iPhone",     "00000001" },
+  { "iPhone",     "idgaf2134" },
+  { "Andr0id",    "11223344" },
 };
 const int NETWORK_COUNT = sizeof(knownNetworks) / sizeof(knownNetworks[0]);
 
