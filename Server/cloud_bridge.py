@@ -217,27 +217,55 @@ def esp_report():
 # ─── SHARED EXAM PROMPT ──────────────────────────────────────────────────────
 def _build_exam_prompt(n_images):
     prefix = (
-        f"You are an expert Professor analyzing exam screenshots "
-        f"({n_images} image(s) may show different parts of the same question).\n\n"
-    ) if n_images > 1 else "You are an expert Professor analyzing an exam screenshot.\n\n"
+        f"You are an expert exam analyst examining {n_images} screenshot(s) "
+        f"that may show different parts of the SAME question. Study ALL images together.\n\n"
+    ) if n_images > 1 else "You are an expert exam analyst examining a screenshot of an exam question.\n\n"
     return (
         prefix +
-        "TASK TYPE DETECTION:\n"
-        "- If this is a MULTIPLE CHOICE question (options A/B/C/D/E/F): return type 'choice'\n"
-        "- If this is a DRAG & DROP task (matching items, sorting, or filling gaps): return type 'drag'\n"
-        "- If this requires a NUMERIC OPEN ANSWER (e.g., math answer '235'): return type 'number'\n\n"
-        "FOR CHOICE: In 'answer' put the index: 1=A, 2=B, 3=C, 4=D, 5=E...\n\n"
-        "FOR DRAG & DROP:\n"
-        "1. Identify ALL empty boxes/slots. Number them 1, 2, 3... strictly TOP-TO-BOTTOM.\n"
-        "2. Identify ALL source buttons. Number them 1, 2, 3... strictly LEFT-TO-RIGHT.\n"
-        "3. In 'matches' return a list for EVERY slot. If a slot can't be filled, set 's' to 0.\n"
-        "   Format: [{\"s\": button_idx, \"d\": 1}, ...]\n\n"
-        "FOR NUMBER: In 'answer' put the integer value directly (e.g. 235).\n\n"
-        "In 'reasoning' provide an extremely brief note (1-3 words) in Russian.\n\n"
-        "In 'confidence' return a number 0..1 indicating your certainty.\n\n"
-        "Respond ONLY with raw JSON:\n"
-        "{\"type\": \"choice|drag|number\", \"reasoning\": \"...\", \"answer\": <int>, "
-        "\"confidence\": <float>, \"matches\": [{\"s\":<int>,\"d\":<int>}, ...]}"
+        "═══ STEP 1 — IDENTIFY TASK TYPE ═══\n"
+        "Carefully look at the interface and pick ONE type:\n"
+        "  'choice'  — radio/checkbox options labeled A B C D E F (or 1 2 3 4 5)\n"
+        "  'drag'    — any task where elements must be MOVED: matching pairs, ordering,\n"
+        "              fill-in-the-blank with draggable tiles, sorting into categories\n"
+        "  'number'  — open numeric input field (type a number as the answer)\n\n"
+
+        "═══ STEP 2 — ANSWER RULES BY TYPE ═══\n\n"
+
+        "FOR 'choice':\n"
+        "  • Put the option index in 'answer': 1=A, 2=B, 3=C, 4=D, 5=E, 6=F\n\n"
+
+        "FOR 'drag' — follow ALL steps below carefully:\n"
+        "  1. READ THE CONTENT: Read every slot label and every draggable item label carefully.\n"
+        "  2. DETECT SUBTYPE:\n"
+        "       • MATCHING  — two columns, connect left item to right item\n"
+        "       • ORDERING  — put items in correct sequence (1st, 2nd, 3rd…)\n"
+        "       • FILL GAP  — drag tiles into blank spaces inside a text/diagram\n"
+        "       • CATEGORY  — sort items into labeled groups/buckets\n"
+        "  3. NUMBER THE SLOTS (destination 'd'): count empty drop-zones\n"
+        "       strictly TOP-TO-BOTTOM, LEFT column before RIGHT column. Start at 1.\n"
+        "  4. NUMBER THE SOURCE ITEMS (source 's'): count draggable buttons/tiles\n"
+        "       strictly LEFT-TO-RIGHT, TOP row before BOTTOM row. Start at 1.\n"
+        "  5. MATCH SEMANTICALLY: for each slot d=1,2,3… choose the source 's' whose\n"
+        "       TEXT/MEANING best fits. Do NOT guess by visual position alone.\n"
+        "  6. DISTRACTORS: there may be MORE source items than slots (extra wrong options).\n"
+        "       Each source item should be used AT MOST ONCE.\n"
+        "  7. If a slot has NO correct match among the sources, set s=0.\n"
+        "  8. Output ONE entry per slot, sorted by 'd' ascending:\n"
+        "       \"matches\": [{\"s\": <src_idx>, \"d\": <slot_idx>}, ...]\n\n"
+
+        "FOR 'number':\n"
+        "  • Put the integer answer in 'answer' (e.g. 42 or 235).\n\n"
+
+        "═══ STEP 3 — QUALITY CHECKS ═══\n"
+        "  ✓ Every slot has exactly one entry in 'matches'\n"
+        "  ✓ No source index ('s') is reused (unless explicitly the same tile appears twice)\n"
+        "  ✓ 'confidence' reflects true certainty (0.0–1.0); use <0.6 if unsure\n"
+        "  ✓ 'reasoning' is 1–5 words in RUSSIAN describing your key reasoning\n\n"
+
+        "═══ OUTPUT — RAW JSON ONLY, no markdown ═══\n"
+        "{\"type\": \"choice|drag|number\", \"subtype\": \"matching|ordering|fill_gap|category|n/a\",\n"
+        " \"reasoning\": \"...\", \"answer\": <int>, \"confidence\": <float>,\n"
+        " \"matches\": [{\"s\":<int>, \"d\":<int>}, ...]}"
     )
 
 def _parse_ai_json(raw_text):
@@ -267,7 +295,7 @@ def call_gpt_vision(filepaths):
 
         resp = client.chat.completions.create(
             model=model,
-            max_tokens=512,
+            max_tokens=1024,
             messages=[{"role": "user", "content": messages_content}]
         )
         raw = resp.choices[0].message.content.strip()
@@ -299,7 +327,7 @@ def call_claude_vision(filepaths):
 
         client  = anthropic_sdk.Anthropic(api_key=api_key)
         message = client.messages.create(
-            model=model, max_tokens=512,
+            model=model, max_tokens=1024,
             messages=[{"role": "user", "content": content_blocks}]
         )
         raw = message.content[0].text.strip()
@@ -331,25 +359,40 @@ def call_gpt_verifier(filepaths, gpt_result, claude_result):
             })
 
         verifier_prompt = (
-            "You are a FINAL JUDGE for an exam question. Two AI models have already analyzed the image(s).\n\n"
-            f"GPT answer:    {json.dumps(gpt_result,    ensure_ascii=False)}\n"
-            f"Claude answer: {json.dumps(claude_result, ensure_ascii=False)}\n\n"
-            "Your task:\n"
-            "1. Re-examine the question carefully with both answers in mind.\n"
-            "2. Choose the CORRECT answer (or synthesize if they both have partial truth).\n"
-            "3. If both agree — confirm. If they disagree — reason which is right.\n\n"
-            "Rules:\n"
-            "- Keep the SAME JSON schema as the input answers.\n"
-            "- In 'reasoning' write 1-5 words in Russian explaining your decision.\n"
-            "- In 'verdict' add one of: 'agreed' | 'gpt_wins' | 'claude_wins' | 'synthesized'\n\n"
-            "Respond ONLY with raw JSON:\n"
-            "{\"type\": \"choice|drag|number\", \"reasoning\": \"...\", \"verdict\": \"...\", "
-            "\"answer\": <int>, \"confidence\": <float>, \"matches\": [{\"s\":<int>,\"d\":<int>}, ...]}"
+            "You are a FINAL JUDGE for an exam question. "
+            "Two AI models already analyzed the image(s) independently.\n\n"
+            f"Model A (GPT):    {json.dumps(gpt_result,    ensure_ascii=False)}\n"
+            f"Model B (Claude): {json.dumps(claude_result, ensure_ascii=False)}\n\n"
+            "YOUR TASK\n"
+            "Re-examine the image(s) carefully, then produce the BEST final answer.\n\n"
+            "GENERAL RULES\n"
+            "• If both models agree → confirm (verdict='agreed').\n"
+            "• If they disagree → reason from the image which is correct\n"
+            "  (verdict='gpt_wins' or 'claude_wins').\n"
+            "• If both are partially right → synthesize the best combination\n"
+            "  (verdict='synthesized').\n\n"
+            "DRAG & DROP SPECIAL RULES (apply when type='drag')\n"
+            "• Compare the models SLOT BY SLOT (d=1, d=2, …).\n"
+            "• For each slot where they disagree: re-read the slot label and both\n"
+            "  candidate source items; pick the semantically correct one.\n"
+            "• You MAY take slot assignments from different models for different slots\n"
+            "  (mixed verdict → use 'synthesized').\n"
+            "• Ensure no source index ('s') is reused across slots.\n"
+            "• Keep all slots present in 'matches', sorted by 'd' ascending.\n\n"
+            "OUTPUT RULES\n"
+            "• 'reasoning': 1–5 words in Russian.\n"
+            "• 'verdict': 'agreed' | 'gpt_wins' | 'claude_wins' | 'synthesized'\n"
+            "• Preserve 'subtype' field if present in inputs.\n"
+            "• Respond ONLY with raw JSON — no markdown, no explanations.\n\n"
+            "{\"type\": \"choice|drag|number\", \"subtype\": \"...\", "
+            "\"reasoning\": \"...\", \"verdict\": \"...\",\n"
+            " \"answer\": <int>, \"confidence\": <float>,\n"
+            " \"matches\": [{\"s\":<int>, \"d\":<int>}, ...]}"
         )
         messages_content.append({"type": "text", "text": verifier_prompt})
 
         resp = client.chat.completions.create(
-            model=model, max_tokens=512,
+            model=model, max_tokens=1024,
             messages=[{"role": "user", "content": messages_content}]
         )
         raw = resp.choices[0].message.content.strip()
