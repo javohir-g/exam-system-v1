@@ -435,17 +435,32 @@ def process_batch(user_id, filepaths, ts):
         claude_r = claude_result if claude_result is not None else stub
 
         # ── Step 3: GPT Verifier ─────────────────────────────────────────────
-        # Only call verifier if both models ran; otherwise just use whoever succeeded
-        if gpt_result is not None and claude_result is not None:
+        # Only call verifier if BOTH models produced a real, useful answer
+        # A model "really answered" drag if it has >=1 match with confidence>0
+        # A model "really answered" choice/number if confidence>0
+        def _is_real_answer(r):
+            if r is None:
+                return False
+            if r.get("confidence", 0.0) <= 0.0:
+                return False
+            if r.get("type") == "drag" and not r.get("matches"):
+                return False  # empty matches = model failed on drag
+            return True
+
+        gpt_real    = _is_real_answer(gpt_result)
+        claude_real = _is_real_answer(claude_result)
+
+        if gpt_real and claude_real:
             final, v_err = call_gpt_verifier(filepaths, gpt_r, claude_r)
             if final is None:
                 # Verifier failed — fall back to GPT
                 final = gpt_r
                 print(f"[!] Verifier failed ({v_err}), using GPT answer", flush=True)
         else:
-            # Only one model worked
-            final = gpt_r if gpt_result is not None else claude_r
-            print(f"[*] Only one model succeeded, using its answer directly", flush=True)
+            # Only one model gave a real answer — use it directly, no verifier
+            final = gpt_r if gpt_real else claude_r
+            winner = "GPT" if gpt_real else "Claude"
+            print(f"[*] Only {winner} gave real answer, skipping verifier", flush=True)
 
         # ── Step 4: build answer queue from final result ──────────────────────
         task_type  = final.get("type", "choice")
@@ -469,10 +484,20 @@ def process_batch(user_id, filepaths, ts):
             letters = {1: "A", 2: "B", 3: "C", 4: "D", 5: "E", 6: "F"}
             tg_answer = f"{answer_val} ({letters.get(answer_val, '?')})"
 
-        # Add verdict + both raw answers to reasoning for Telegram info
-        gpt_short    = f"{gpt_r.get('answer','?')}"
-        claude_short = f"{claude_r.get('answer','?')}"
-        reasoning = f"{reasoning} [GPT:{gpt_short} Claude:{claude_short} → {verdict}]"
+        # Add verdict + model summaries to reasoning for Telegram display
+        def _short_summary(r, label):
+            if r is None or r.get("confidence", 0) <= 0:
+                return f"{label}:✗"
+            t = r.get("type", "?")
+            if t == "drag":
+                mx = r.get("matches", [])
+                pairs = ",".join(f"{m.get('s')}→{m.get('d')}" for m in mx[:3])
+                return f"{label}:[{pairs}{'…' if len(mx)>3 else ''}]"
+            return f"{label}:{r.get('answer', '?')}"
+
+        gpt_summary    = _short_summary(gpt_result,    "GPT")
+        claude_summary = _short_summary(claude_result, "CL")
+        reasoning = f"{reasoning} {gpt_summary} {claude_summary} → {verdict}"
 
         answer_queue[user_id] = user_queue
         print(f"[Final] User {user_id} → type={task_type}, answer={tg_answer}, verdict={verdict}, queued {len(user_queue)}", flush=True)
