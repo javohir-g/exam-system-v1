@@ -63,31 +63,77 @@ def save_data():
 load_data()
 
 # --- TELEGRAM NOTIFICATIONS ---
-def send_to_telegram(user_id, filepaths, answer_text, reasoning):
-    """Send screenshot(s) + AI result to Telegram. Supports media groups for multiple images."""
-    token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+def _build_tg_caption(user_id, task_type, answer_val, matches, subtype, reasoning, confidence):
+    """Build a structured Telegram caption based on task type."""
+    LETTERS = {1: "A", 2: "B", 3: "C", 4: "D", 5: "E", 6: "F"}
+    tg_mention = tg_users.get(str(user_id), "").replace("_", "\\_")
+    mention_line = f"\n👤 {tg_mention}" if tg_mention else ""
+    conf_pct = int(round(confidence * 100))
+    conf_bar = "█" * (conf_pct // 10) + "░" * (10 - conf_pct // 10)
+    reasoning_esc = str(reasoning).replace("_", "\\_")
+
+    header = f"📡 *NODE {user_id}*{mention_line}\n"
+
+    if task_type == "drag":
+        subtype_label = {
+            "matching": "🔗 Matching", "ordering": "🔢 Ordering",
+            "fill_gap": "✏️ Fill Gap", "category": "📂 Category"
+        }.get(subtype, "🖱 Drag & Drop")
+        sorted_m = sorted(matches or [], key=lambda x: x.get('d', 0))
+        rows = "\n".join(
+            f"  `Slot {m.get('d')}` ← *Item {m.get('s')}*"
+            for m in sorted_m
+        )
+        return (
+            header +
+            f"*{subtype_label}*\n"
+            f"━━━━━━━━━━━━━━━━\n"
+            f"{rows}\n"
+            f"━━━━━━━━━━━━━━━━\n"
+            f"🧠 {reasoning_esc}\n"
+            f"� `{conf_bar}` {conf_pct}%"
+        )
+    elif task_type == "number":
+        return (
+            header +
+            f"*🔢 Numeric Answer*\n"
+            f"━━━━━━━━━━━━━━━━\n"
+            f"   `{answer_val}`\n"
+            f"━━━━━━━━━━━━━━━━\n"
+            f"🧠 {reasoning_esc}\n"
+            f"📊 `{conf_bar}` {conf_pct}%"
+        )
+    else:  # choice
+        letter = LETTERS.get(answer_val, "?")
+        pills = "  ".join(
+            f"*[{LETTERS[i]}]*" if i == answer_val else f"{LETTERS[i]}"
+            for i in range(1, 7) if i <= 6
+        )
+        return (
+            header +
+            f"*🎯 Multiple Choice*\n"
+            f"━━━━━━━━━━━━━━━━\n"
+            f"   ✅ *{letter}* (option {answer_val})\n"
+            f"━━━━━━━━━━━━━━━━\n"
+            f"🧠 {reasoning_esc}\n"
+            f"📊 `{conf_bar}` {conf_pct}%"
+        )
+
+
+def send_to_telegram(user_id, filepaths, task_type, answer_val, matches, subtype, reasoning, confidence):
+    """Send screenshot(s) + structured AI result to Telegram."""
+    token   = os.environ.get("TELEGRAM_BOT_TOKEN", "")
     chat_id = os.environ.get("TELEGRAM_CHAT_ID", "")
     if not token or not chat_id:
         return
-    
+
     try:
-        # Escape underscores for Telegram Markdown (common cause of 400 Bad Request)
-        tg_mention_escaped = tg_users.get(str(user_id), "").replace("_", "\\_")
-        mention_line = f"\n👤 {tg_mention_escaped}" if tg_mention_escaped else ""
-        
-        reasoning_escaped = reasoning.replace("_", "\\_")
-        
-        caption = (
-            f"📡 *NODE {user_id}*{mention_line}\n"
-            f"✅ *Answer:* `{answer_text}`\n"
-            f"🧠 *Reasoning:* {reasoning_escaped}"
-        )
+        caption = _build_tg_caption(user_id, task_type, answer_val, matches, subtype, reasoning, confidence)
 
         if isinstance(filepaths, str):
             filepaths = [filepaths]
 
         if len(filepaths) == 1:
-            # Single photo
             with open(filepaths[0], "rb") as photo:
                 r = requests.post(
                     f"https://api.telegram.org/bot{token}/sendPhoto",
@@ -95,9 +141,8 @@ def send_to_telegram(user_id, filepaths, answer_text, reasoning):
                     files={"photo": photo},
                     timeout=15
                 )
-                print(f"[TG] Single photo status: {r.status_code}, Response: {r.text}", flush=True)
+                print(f"[TG] Single photo status: {r.status_code}", flush=True)
         else:
-            # Multiple photos — send as media group
             media = []
             files = {}
             for i, fp in enumerate(filepaths):
@@ -114,7 +159,7 @@ def send_to_telegram(user_id, filepaths, answer_text, reasoning):
                 files=files,
                 timeout=30
             )
-            print(f"[TG] Media group status: {r.status_code}, Response: {r.text}", flush=True)
+            print(f"[TG] Media group status: {r.status_code}", flush=True)
             for f in files.values():
                 f.close()
 
@@ -505,15 +550,31 @@ def process_batch(user_id, filepaths, ts):
     if user_id not in user_data:
         user_data[user_id] = {"history": []}
 
+    # Structured history entry
     filenames = [os.path.basename(f) for f in filepaths]
+
+    # Extract structured fields if we have a final answer
+    hist_task_type  = task_type  if 'task_type'  in dir() else "choice"
+    hist_matches    = sorted(final.get("matches", []), key=lambda x: x.get('d', 0)) if 'final' in dir() and hist_task_type == "drag" else []
+    hist_answer_val = final.get("answer", 0) if 'final' in dir() else 0
+    hist_subtype    = final.get("subtype", "n/a") if 'final' in dir() else "n/a"
+
     user_data[user_id]["history"].append({
-        "timestamp": get_now(),
-        "filenames": filenames,
-        "answer": tg_answer,
-        "reasoning": reasoning,
+        "timestamp":  get_now(),
+        "filenames":  filenames,
+        "task_type":  hist_task_type,
+        "subtype":    hist_subtype,
+        "answer":     tg_answer,
+        "answer_val": hist_answer_val,
+        "matches":    hist_matches,
+        "reasoning":  reasoning,
         "confidence": confidence
     })
-    send_to_telegram(user_id, filepaths, tg_answer, reasoning)
+    send_to_telegram(
+        user_id, filepaths,
+        hist_task_type, hist_answer_val, hist_matches, hist_subtype,
+        reasoning, confidence
+    )
     save_data()
 
 @app.route("/reconnect", methods=["POST"])
