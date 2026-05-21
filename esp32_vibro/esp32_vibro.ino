@@ -25,7 +25,7 @@ const char* reportUrl = "https://exam-system-v1.onrender.com/esp_report";
 const char* secretKey = "super-secret-key";
 
 // Change this ID for each device (1-15)
-const int USER_ID = 5;
+const int USER_ID = 2;
 
 // Pin for XIAO ESP32C3
 const int MOTOR_PIN = D6;

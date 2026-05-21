@@ -5,6 +5,8 @@ import os
 import traceback
 import json
 import base64
+import re
+import concurrent.futures
 from datetime import datetime
 from flask import Flask, request, jsonify, render_template, send_from_directory
 from dotenv import load_dotenv
@@ -212,122 +214,230 @@ def esp_report():
     return "OK", 200
 
 
-def process_batch(user_id, filepaths, ts):
-    """Called after 3s timeout: runs AI on all buffered photos and notifies."""
-    print(f"[*] Processing batch for User {user_id}: {len(filepaths)} photo(s)", flush=True)
+# ─── SHARED EXAM PROMPT ──────────────────────────────────────────────────────
+def _build_exam_prompt(n_images):
+    prefix = (
+        f"You are an expert Professor analyzing exam screenshots "
+        f"({n_images} image(s) may show different parts of the same question).\n\n"
+    ) if n_images > 1 else "You are an expert Professor analyzing an exam screenshot.\n\n"
+    return (
+        prefix +
+        "TASK TYPE DETECTION:\n"
+        "- If this is a MULTIPLE CHOICE question (options A/B/C/D/E/F): return type 'choice'\n"
+        "- If this is a DRAG & DROP task (matching items, sorting, or filling gaps): return type 'drag'\n"
+        "- If this requires a NUMERIC OPEN ANSWER (e.g., math answer '235'): return type 'number'\n\n"
+        "FOR CHOICE: In 'answer' put the index: 1=A, 2=B, 3=C, 4=D, 5=E...\n\n"
+        "FOR DRAG & DROP:\n"
+        "1. Identify ALL empty boxes/slots. Number them 1, 2, 3... strictly TOP-TO-BOTTOM.\n"
+        "2. Identify ALL source buttons. Number them 1, 2, 3... strictly LEFT-TO-RIGHT.\n"
+        "3. In 'matches' return a list for EVERY slot. If a slot can't be filled, set 's' to 0.\n"
+        "   Format: [{\"s\": button_idx, \"d\": 1}, ...]\n\n"
+        "FOR NUMBER: In 'answer' put the integer value directly (e.g. 235).\n\n"
+        "In 'reasoning' provide an extremely brief note (1-3 words) in Russian.\n\n"
+        "In 'confidence' return a number 0..1 indicating your certainty.\n\n"
+        "Respond ONLY with raw JSON:\n"
+        "{\"type\": \"choice|drag|number\", \"reasoning\": \"...\", \"answer\": <int>, "
+        "\"confidence\": <float>, \"matches\": [{\"s\":<int>,\"d\":<int>}, ...]}"
+    )
 
-    ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip().replace('"', '').replace("'", "")
-    CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-haiku-4-5").strip()
-    answer = 0
-    answer2 = 0
-    reasoning = "No Claude key"
+def _parse_ai_json(raw_text):
+    """Extract and parse JSON from raw AI response text."""
+    m = re.search(r'\{.*\}', raw_text, re.DOTALL)
+    return json.loads((m.group(0) if m else raw_text).strip())
 
-    if ANTHROPIC_API_KEY and ANTHROPIC_API_KEY != "your_key_here":
-        try:
-            import anthropic as anthropic_sdk
-            content_blocks = []
-            for fpath in filepaths:
-                with open(fpath, "rb") as f:
-                    b64 = base64.b64encode(f.read()).decode('utf-8')
-                content_blocks.append({
-                    "type": "image",
-                    "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}
-                })
+# ─── GPT VISION CALL ─────────────────────────────────────────────────────────
+def call_gpt_vision(filepaths):
+    """Send images to GPT-4o Vision and return parsed JSON dict."""
+    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    model   = os.environ.get("OPENAI_MODEL", "gpt-4o").strip()
+    if not api_key:
+        return None, "No OpenAI key"
+    try:
+        import openai
+        client = openai.OpenAI(api_key=api_key)
+        messages_content = []
+        for fpath in filepaths:
+            with open(fpath, "rb") as f:
+                b64 = base64.b64encode(f.read()).decode()
+            messages_content.append({
+                "type": "image_url",
+                "image_url": {"url": f"data:image/jpeg;base64,{b64}", "detail": "high"}
+            })
+        messages_content.append({"type": "text", "text": _build_exam_prompt(len(filepaths))})
 
-            prompt_prefix = (
-                "You are an expert Professor analyzing exam screenshots "
-                f"({len(filepaths)} image(s) may show different parts of the same question).\n\n"
-            ) if len(filepaths) > 1 else "You are an expert Professor analyzing an exam screenshot.\n\n"
+        resp = client.chat.completions.create(
+            model=model,
+            max_tokens=512,
+            messages=[{"role": "user", "content": messages_content}]
+        )
+        raw = resp.choices[0].message.content.strip()
+        parsed = _parse_ai_json(raw)
+        print(f"[GPT]  raw={raw[:120]}", flush=True)
+        return parsed, None
+    except Exception as e:
+        print(f"[!] GPT Vision error: {e}", flush=True)
+        return None, str(e)
 
+# ─── CLAUDE VISION CALL ──────────────────────────────────────────────────────
+def call_claude_vision(filepaths):
+    """Send images to Claude Vision and return parsed JSON dict."""
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip().replace('"','').replace("'","")
+    model   = os.environ.get("CLAUDE_MODEL", "claude-3-5-sonnet-20240620").strip()
+    if not api_key or api_key == "your_key_here":
+        return None, "No Anthropic key"
+    try:
+        import anthropic as anthropic_sdk
+        content_blocks = []
+        for fpath in filepaths:
+            with open(fpath, "rb") as f:
+                b64 = base64.b64encode(f.read()).decode()
             content_blocks.append({
-                "type": "text",
-                "text": (
-                    prompt_prefix +
-                    "TASK TYPE DETECTION:\n"
-                    "- If this is a MULTIPLE CHOICE question (options A/B/C/D/E/F): return type 'choice'\n"
-                    "- If this is a DRAG & DROP task (matching items, sorting, or filling gaps): return type 'drag'\n"
-                    "- If this requires a NUMERIC OPEN ANSWER (e.g., math answer '235'): return type 'number'\n\n"
-                    "FOR CHOICE: In 'answer' put the index: 1=A, 2=B, 3=C, 4=D, 5=E... \n\n"
-                    "FOR DRAG & DROP:\n"
-                    "1. Identify ALL empty boxes/slots. Number them 1, 2, 3... strictly from TOP-TO-BOTTOM.\n"
-                    "2. Identify ALL source buttons. Number them 1, 2, 3... strictly from LEFT-TO-RIGHT.\n"
-                    "3. In 'matches' return a list for EVERY slot. If a slot can't be filled, set 's' to 0.\n"
-                    "   Format: [{\"s\": button_idx, \"d\": 1}, ...]\n\n"
-                    "FOR NUMBER: In 'answer' put the integer value directly (e.g. 235).\n\n"
-                    "In 'reasoning' provide an extremely brief note (1-3 words) in Russian.\n\n"
-                    "ADDITIONAL: In 'confidence' return a number from 0 to 1 indicating your certainty.\n\n"
-                    "Respond ONLY with raw JSON: {\"type\": \"choice|drag|number\", \"reasoning\": \"...\", \"answer\": <int>, \"confidence\": <float>, \"matches\": [{\"s\":<int>,\"d\":<int>}, ...]}"
-                )
+                "type": "image",
+                "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}
+            })
+        content_blocks.append({"type": "text", "text": _build_exam_prompt(len(filepaths))})
+
+        client  = anthropic_sdk.Anthropic(api_key=api_key)
+        message = client.messages.create(
+            model=model, max_tokens=512,
+            messages=[{"role": "user", "content": content_blocks}]
+        )
+        raw = message.content[0].text.strip()
+        parsed = _parse_ai_json(raw)
+        print(f"[Claude] raw={raw[:120]}", flush=True)
+        return parsed, None
+    except Exception as e:
+        print(f"[!] Claude Vision error: {e}", flush=True)
+        return None, str(e)
+
+# ─── GPT VERIFIER ────────────────────────────────────────────────────────────
+def call_gpt_verifier(filepaths, gpt_result, claude_result):
+    """GPT receives both answers + images, compares, and returns the best final JSON."""
+    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    model   = os.environ.get("OPENAI_MODEL", "gpt-4o").strip()
+    if not api_key:
+        return None, "No OpenAI key for verifier"
+    try:
+        import openai
+        client = openai.OpenAI(api_key=api_key)
+
+        messages_content = []
+        for fpath in filepaths:
+            with open(fpath, "rb") as f:
+                b64 = base64.b64encode(f.read()).decode()
+            messages_content.append({
+                "type": "image_url",
+                "image_url": {"url": f"data:image/jpeg;base64,{b64}", "detail": "high"}
             })
 
-            client = anthropic_sdk.Anthropic(api_key=ANTHROPIC_API_KEY)
-            message = client.messages.create(
-                model=CLAUDE_MODEL,
-                max_tokens=256,
-                messages=[{"role": "user", "content": content_blocks}]
-            )
+        verifier_prompt = (
+            "You are a FINAL JUDGE for an exam question. Two AI models have already analyzed the image(s).\n\n"
+            f"GPT answer:    {json.dumps(gpt_result,    ensure_ascii=False)}\n"
+            f"Claude answer: {json.dumps(claude_result, ensure_ascii=False)}\n\n"
+            "Your task:\n"
+            "1. Re-examine the question carefully with both answers in mind.\n"
+            "2. Choose the CORRECT answer (or synthesize if they both have partial truth).\n"
+            "3. If both agree — confirm. If they disagree — reason which is right.\n\n"
+            "Rules:\n"
+            "- Keep the SAME JSON schema as the input answers.\n"
+            "- In 'reasoning' write 1-5 words in Russian explaining your decision.\n"
+            "- In 'verdict' add one of: 'agreed' | 'gpt_wins' | 'claude_wins' | 'synthesized'\n\n"
+            "Respond ONLY with raw JSON:\n"
+            "{\"type\": \"choice|drag|number\", \"reasoning\": \"...\", \"verdict\": \"...\", "
+            "\"answer\": <int>, \"confidence\": <float>, \"matches\": [{\"s\":<int>,\"d\":<int>}, ...]}"
+        )
+        messages_content.append({"type": "text", "text": verifier_prompt})
 
-            content = message.content[0].text.strip()
-            
-            # Robust JSON extraction using regex
-            import re
-            json_match = re.search(r'\{.*\}', content, re.DOTALL)
-            if json_match:
-                json_str = json_match.group(0)
-            else:
-                json_str = content
+        resp = client.chat.completions.create(
+            model=model, max_tokens=512,
+            messages=[{"role": "user", "content": messages_content}]
+        )
+        raw = resp.choices[0].message.content.strip()
+        parsed = _parse_ai_json(raw)
+        print(f"[GPT-Verifier] verdict={parsed.get('verdict','?')} raw={raw[:120]}", flush=True)
+        return parsed, None
+    except Exception as e:
+        print(f"[!] GPT Verifier error: {e}", flush=True)
+        return None, str(e)
 
-            try:
-                parsed = json.loads(json_str.strip())
-            except Exception as parse_e:
-                print(f"[!] JSON Parse Error: {parse_e}", flush=True)
-                print(f"[RAW CONTENT]: {content}", flush=True)
-                raise parse_e
+# ─── MAIN BATCH PROCESSOR ────────────────────────────────────────────────────
+def process_batch(user_id, filepaths, ts):
+    """Parallel GPT + Claude → GPT Verifier → final answer."""
+    print(f"[*] Processing batch for User {user_id}: {len(filepaths)} photo(s)", flush=True)
 
-            task_type = parsed.get("type", "choice")
-            reasoning = parsed.get("reasoning", "Parsed OK")
-            confidence = parsed.get("confidence", 0.0)
-            
-            # Populate the queue
-            user_queue = []
-            tg_answer = "0"
+    tg_answer  = "Error"
+    reasoning  = "AI unavailable"
+    confidence = 0.0
+    user_queue = []
 
-            if task_type == "drag":
-                matches = parsed.get("matches", [])
-                # Sort matches by target slot (d) to ensure 1, 2, 3... order
-                sorted_matches = sorted(matches, key=lambda x: x.get('d', 0))
-                
-                for i, m in enumerate(sorted_matches):
-                    user_queue.append({"count": m.get("s", 0), "count2": 0, "cmd_id": ts + i})
-                
-                tg_answer = "\n".join([f"{m.get('d')}) {m.get('s')}" for m in sorted_matches])
-            elif task_type == "number":
-                answer_val = parsed.get("answer", 0)
-                user_queue.append({"count": answer_val, "count2": 0, "cmd_id": ts, "is_num": True})
-                tg_answer = str(answer_val)
-            else:
-                answer_val = parsed.get("answer", 0)
-                user_queue.append({"count": answer_val, "count2": 0, "cmd_id": ts})
-                
-                letters = {1: "A", 2: "B", 3: "C", 4: "D", 5: "E", 6: "F"}
-                tg_answer = f"{answer_val} ({letters.get(answer_val, '?')})"
+    # ── Step 1: call GPT and Claude in PARALLEL ──────────────────────────────
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+        fut_gpt    = pool.submit(call_gpt_vision,    filepaths)
+        fut_claude = pool.submit(call_claude_vision, filepaths)
+        gpt_result,    gpt_err    = fut_gpt.result()
+        claude_result, claude_err = fut_claude.result()
 
-            answer_queue[user_id] = user_queue
-            print(f"[Claude] User {user_id} -> type={task_type}, queued {len(user_queue)} commands.", flush=True)
+    print(f"[*] GPT result: {gpt_result}, Claude result: {claude_result}", flush=True)
 
-        except Exception as ai_e:
-            print(f"[!] Claude Exception: {ai_e}", flush=True)
-            traceback.print_exc()
-            reasoning = f"Claude Error: {str(ai_e)}"
-            tg_answer = "Error"
-            confidence = 0.0
+    # ── Step 2: decide which results to pass to verifier ────────────────────
+    both_failed = (gpt_result is None and claude_result is None)
+    if both_failed:
+        reasoning = f"GPT: {gpt_err} | Claude: {claude_err}"
+        print(f"[!] Both AI failed for User {user_id}", flush=True)
+    else:
+        # Fill in a stub if one side failed
+        stub = {"type": "choice", "answer": 0, "confidence": 0.0,
+                "reasoning": "N/A", "matches": []}
+        gpt_r    = gpt_result    if gpt_result    is not None else stub
+        claude_r = claude_result if claude_result is not None else stub
+
+        # ── Step 3: GPT Verifier ─────────────────────────────────────────────
+        # Only call verifier if both models ran; otherwise just use whoever succeeded
+        if gpt_result is not None and claude_result is not None:
+            final, v_err = call_gpt_verifier(filepaths, gpt_r, claude_r)
+            if final is None:
+                # Verifier failed — fall back to GPT
+                final = gpt_r
+                print(f"[!] Verifier failed ({v_err}), using GPT answer", flush=True)
+        else:
+            # Only one model worked
+            final = gpt_r if gpt_result is not None else claude_r
+            print(f"[*] Only one model succeeded, using its answer directly", flush=True)
+
+        # ── Step 4: build answer queue from final result ──────────────────────
+        task_type  = final.get("type", "choice")
+        reasoning  = final.get("reasoning", "OK")
+        confidence = final.get("confidence", 0.0)
+        verdict    = final.get("verdict", "—")
+
+        if task_type == "drag":
+            matches = final.get("matches", [])
+            sorted_matches = sorted(matches, key=lambda x: x.get('d', 0))
+            for i, m in enumerate(sorted_matches):
+                user_queue.append({"count": m.get("s", 0), "count2": 0, "cmd_id": ts + i})
+            tg_answer = "\n".join([f"{m.get('d')}) {m.get('s')}" for m in sorted_matches])
+        elif task_type == "number":
+            answer_val = final.get("answer", 0)
+            user_queue.append({"count": answer_val, "count2": 0, "cmd_id": ts, "is_num": True})
+            tg_answer = str(answer_val)
+        else:
+            answer_val = final.get("answer", 0)
+            user_queue.append({"count": answer_val, "count2": 0, "cmd_id": ts})
+            letters = {1: "A", 2: "B", 3: "C", 4: "D", 5: "E", 6: "F"}
+            tg_answer = f"{answer_val} ({letters.get(answer_val, '?')})"
+
+        # Add verdict + both raw answers to reasoning for Telegram info
+        gpt_short    = f"{gpt_r.get('answer','?')}"
+        claude_short = f"{claude_r.get('answer','?')}"
+        reasoning = f"{reasoning} [GPT:{gpt_short} Claude:{claude_short} → {verdict}]"
+
+        answer_queue[user_id] = user_queue
+        print(f"[Final] User {user_id} → type={task_type}, answer={tg_answer}, verdict={verdict}, queued {len(user_queue)}", flush=True)
 
     if user_id not in user_data:
         user_data[user_id] = {"history": []}
-    
-    # Store ALL filenames from the batch
+
     filenames = [os.path.basename(f) for f in filepaths]
-    
     user_data[user_id]["history"].append({
         "timestamp": get_now(),
         "filenames": filenames,
