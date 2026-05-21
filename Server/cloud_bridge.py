@@ -63,8 +63,8 @@ def save_data():
 load_data()
 
 # --- TELEGRAM NOTIFICATIONS ---
-def _build_tg_caption(user_id, task_type, answer_val, matches, subtype, reasoning, confidence):
-    """Build a structured Telegram caption based on task type."""
+def _build_tg_caption(user_id, task_type, answer_val, matches, subtype, reasoning, confidence, gpt_res=None, claude_res=None, verdict="—"):
+    """Build a structured Telegram caption with separate model outputs."""
     LETTERS = {1: "A", 2: "B", 3: "C", 4: "D", 5: "E", 6: "F"}
     tg_mention = tg_users.get(str(user_id), "").replace("_", "\\_")
     mention_line = f"\n👤 {tg_mention}" if tg_mention else ""
@@ -73,6 +73,28 @@ def _build_tg_caption(user_id, task_type, answer_val, matches, subtype, reasonin
     reasoning_esc = str(reasoning).replace("_", "\\_")
 
     header = f"📡 *NODE {user_id}*{mention_line}\n"
+
+    def _fmt_model(res, label):
+        if not res or res.get("confidence", 0) <= 0:
+            return f"{label}: ✗ _No answer_"
+        
+        t = res.get("type", "?")
+        ans = res.get("answer", "?")
+        if t == "drag":
+            mx = res.get("matches", [])
+            pairs = ",".join(f"{m.get('s')}→{m.get('d')}" for m in mx[:2])
+            val = f"[{pairs}{'…' if len(mx)>2 else ''}] (drag)"
+        elif t == "choice":
+            val = f"{ans} ({LETTERS.get(ans, '?')})"
+        else:
+            val = str(ans)
+        
+        re_msg = str(res.get("reasoning", "OK")).replace("_", "\\_")
+        return f"{label}: *{val}* _({re_msg})_"
+
+    gpt_line    = _fmt_model(gpt_res,    "🤖 GPT")
+    claude_line = _fmt_model(claude_res, "🤖 CL")
+    verdict_line = f"⚖️ Verdict: *{verdict}*"
 
     if task_type == "drag":
         subtype_label = {
@@ -88,39 +110,44 @@ def _build_tg_caption(user_id, task_type, answer_val, matches, subtype, reasonin
             header +
             f"*{subtype_label}*\n"
             f"━━━━━━━━━━━━━━━━\n"
-            f"{rows}\n"
+            f"{rows}\n\n"
+            f"{gpt_line}\n"
+            f"{claude_line}\n"
+            f"{verdict_line}\n"
             f"━━━━━━━━━━━━━━━━\n"
             f"🧠 {reasoning_esc}\n"
-            f"� `{conf_bar}` {conf_pct}%"
+            f"📊 `{conf_bar}` {conf_pct}%"
         )
     elif task_type == "number":
         return (
             header +
             f"*🔢 Numeric Answer*\n"
             f"━━━━━━━━━━━━━━━━\n"
-            f"   `{answer_val}`\n"
+            f"   `{answer_val}`\n\n"
+            f"{gpt_line}\n"
+            f"{claude_line}\n"
+            f"{verdict_line}\n"
             f"━━━━━━━━━━━━━━━━\n"
             f"🧠 {reasoning_esc}\n"
             f"📊 `{conf_bar}` {conf_pct}%"
         )
     else:  # choice
         letter = LETTERS.get(answer_val, "?")
-        pills = "  ".join(
-            f"*[{LETTERS[i]}]*" if i == answer_val else f"{LETTERS[i]}"
-            for i in range(1, 7) if i <= 6
-        )
         return (
             header +
             f"*🎯 Multiple Choice*\n"
             f"━━━━━━━━━━━━━━━━\n"
-            f"   ✅ *{letter}* (option {answer_val})\n"
+            f"   ✅ *{letter}* (option {answer_val})\n\n"
+            f"{gpt_line}\n"
+            f"{claude_line}\n"
+            f"{verdict_line}\n"
             f"━━━━━━━━━━━━━━━━\n"
             f"🧠 {reasoning_esc}\n"
             f"📊 `{conf_bar}` {conf_pct}%"
         )
 
 
-def send_to_telegram(user_id, filepaths, task_type, answer_val, matches, subtype, reasoning, confidence):
+def send_to_telegram(user_id, filepaths, task_type, answer_val, matches, subtype, reasoning, confidence, gpt_res=None, claude_res=None, verdict="—"):
     """Send screenshot(s) + structured AI result to Telegram."""
     token   = os.environ.get("TELEGRAM_BOT_TOKEN", "")
     chat_id = os.environ.get("TELEGRAM_CHAT_ID", "")
@@ -128,7 +155,7 @@ def send_to_telegram(user_id, filepaths, task_type, answer_val, matches, subtype
         return
 
     try:
-        caption = _build_tg_caption(user_id, task_type, answer_val, matches, subtype, reasoning, confidence)
+        caption = _build_tg_caption(user_id, task_type, answer_val, matches, subtype, reasoning, confidence, gpt_res, claude_res, verdict)
 
         if isinstance(filepaths, str):
             filepaths = [filepaths]
@@ -568,12 +595,18 @@ def process_batch(user_id, filepaths, ts):
         "answer_val": hist_answer_val,
         "matches":    hist_matches,
         "reasoning":  reasoning,
-        "confidence": confidence
+        "confidence": confidence,
+        "verdict":    verdict if 'verdict' in dir() else "—",
+        "gpt_res":    gpt_r if 'gpt_r' in dir() else None,
+        "claude_res": claude_r if 'claude_r' in dir() else None
     })
     send_to_telegram(
         user_id, filepaths,
         hist_task_type, hist_answer_val, hist_matches, hist_subtype,
-        reasoning, confidence
+        reasoning, confidence,
+        gpt_res=gpt_r if 'gpt_r' in dir() else None,
+        claude_res=claude_r if 'claude_r' in dir() else None,
+        verdict=verdict if 'verdict' in dir() else "—"
     )
     save_data()
 

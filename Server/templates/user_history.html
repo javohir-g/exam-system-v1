@@ -391,6 +391,51 @@
             text-align: right;
         }
 
+        /* Comparison block */
+        .comparison-block {
+            margin-top: 15px;
+            padding: 12px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .comp-item {
+            display: grid;
+            grid-template-columns: 80px 1fr;
+            gap: 8px;
+            align-items: baseline;
+        }
+        .comp-label {
+            font-size: 0.65rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            letter-spacing: 0.5px;
+        }
+        .comp-val {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+        .comp-reasoning {
+            grid-column: 2;
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            opacity: 0.8;
+            line-height: 1.4;
+            font-style: italic;
+        }
+        .comp-verdict {
+            border-top: 1px solid var(--glass-border);
+            padding-top: 8px;
+            font-size: 0.75rem;
+            color: var(--text-main);
+            text-align: right;
+        }
+
         /* Empty */
         .empty {
             text-align: center;
@@ -546,6 +591,28 @@
             {% if entry.reasoning %}
             <div class="ai-reasoning">🧠 {{ entry.reasoning }}</div>
             {% endif %}
+
+            <!-- Comparison Block -->
+            <div class="comparison-block">
+                <div class="comp-item">
+                    <span class="comp-label">GPT-4o</span>
+                    <span class="comp-val">{{ entry.gpt_res.answer if entry.gpt_res and entry.gpt_res.answer else '✗' }}</span>
+                    {% if entry.gpt_res and entry.gpt_res.reasoning %}
+                    <div class="comp-reasoning">{{ entry.gpt_res.reasoning }}</div>
+                    {% endif %}
+                </div>
+                <div class="comp-item">
+                    <span class="comp-label">Claude 3.5</span>
+                    <span class="comp-val">{{ entry.claude_res.answer if entry.claude_res and entry.claude_res.answer else '✗' }}</span>
+                    {% if entry.claude_res and entry.claude_res.reasoning %}
+                    <div class="comp-reasoning">{{ entry.claude_res.reasoning }}</div>
+                    {% endif %}
+                </div>
+                <div class="comp-verdict">
+                    ⚖️ Verdict: <strong>{{ entry.verdict if entry.verdict else '—' }}</strong>
+                </div>
+            </div>
+
             {% if entry.confidence is defined %}
             <div class="confidence-row">
               <span class="conf-label">Confidence</span>
