@@ -703,14 +703,38 @@
             {% endif %}
                 <div class="comp-item">
                     <span class="comp-label">GPT-4o</span>
-                    <span class="comp-val">{{ entry.gpt_res.answer if entry.gpt_res and entry.gpt_res is mapping and entry.gpt_res.answer else '✗' }}</span>
+                    <span class="comp-val">
+                        {% if entry.gpt_res and entry.gpt_res is mapping %}
+                            {% if entry.gpt_res.answer is defined and entry.gpt_res.answer != 'TWIN' %}
+                                {{ entry.gpt_res.answer }}
+                            {% elif entry.gpt_res.matches %}
+                                [{% for m in entry.gpt_res.matches[:2] %}{{m.s}}→{{m.d}}{% if not loop.last %},{% endif %}{% endfor %}{% if entry.gpt_res.matches|length > 2 %}...{% endif %}]
+                            {% else %}
+                                {{ entry.gpt_res.answer if entry.gpt_res.answer else '✗' }}
+                            {% endif %}
+                        {% else %}
+                            ✗
+                        {% endif %}
+                    </span>
                     {% if entry.gpt_res and entry.gpt_res is mapping and entry.gpt_res.reasoning %}
                     <div class="comp-reasoning">{{ entry.gpt_res.reasoning }}</div>
                     {% endif %}
                 </div>
                 <div class="comp-item">
                     <span class="comp-label">Claude 3.5</span>
-                    <span class="comp-val">{{ entry.claude_res.answer if entry.claude_res and entry.claude_res is mapping and entry.claude_res.answer else '✗' }}</span>
+                    <span class="comp-val">
+                        {% if entry.claude_res and entry.claude_res is mapping %}
+                            {% if entry.claude_res.answer is defined %}
+                                {{ entry.claude_res.answer }}
+                            {% elif entry.claude_res.matches %}
+                                [{% for m in entry.claude_res.matches[:2] %}{{m.s}}→{{m.d}}{% if not loop.last %},{% endif %}{% endfor %}{% if entry.claude_res.matches|length > 2 %}...{% endif %}]
+                            {% else %}
+                                ✗
+                            {% endif %}
+                        {% else %}
+                            ✗
+                        {% endif %}
+                    </span>
                     {% if entry.claude_res and entry.claude_res is mapping and entry.claude_res.reasoning %}
                     <div class="comp-reasoning">{{ entry.claude_res.reasoning }}</div>
                     {% endif %}
