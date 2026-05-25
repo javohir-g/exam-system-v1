@@ -702,15 +702,15 @@
             {% endif %}
                 <div class="comp-item">
                     <span class="comp-label">GPT-4o</span>
-                    <span class="comp-val">{{ entry.gpt_res.answer if entry.gpt_res and entry.gpt_res.answer else '✗' }}</span>
-                    {% if entry.gpt_res and entry.gpt_res.reasoning %}
+                    <span class="comp-val">{{ entry.gpt_res.answer if entry.gpt_res and entry.gpt_res is mapping and entry.gpt_res.answer else '✗' }}</span>
+                    {% if entry.gpt_res and entry.gpt_res is mapping and entry.gpt_res.reasoning %}
                     <div class="comp-reasoning">{{ entry.gpt_res.reasoning }}</div>
                     {% endif %}
                 </div>
                 <div class="comp-item">
                     <span class="comp-label">Claude 3.5</span>
-                    <span class="comp-val">{{ entry.claude_res.answer if entry.claude_res and entry.claude_res.answer else '✗' }}</span>
-                    {% if entry.claude_res and entry.claude_res.reasoning %}
+                    <span class="comp-val">{{ entry.claude_res.answer if entry.claude_res and entry.claude_res is mapping and entry.claude_res.answer else '✗' }}</span>
+                    {% if entry.claude_res and entry.claude_res is mapping and entry.claude_res.reasoning %}
                     <div class="comp-reasoning">{{ entry.claude_res.reasoning }}</div>
                     {% endif %}
                 </div>
