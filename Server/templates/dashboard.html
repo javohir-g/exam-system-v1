@@ -438,7 +438,9 @@
                     <div class="badges" style="align-items:center;">
                         {% if data.history %}
                             {% set last = data.history[-1] %}
+                            {% if last is mapping %}
                             <div class="badge pipeline-badge">{{ last.verdict.upper() if last.verdict else 'DIRECT' }}</div>
+                            {% endif %}
                         {% endif %}
                         <span class="badge tg-badge" style="display:none;"></span>
                         {% set r = data.rssi|int if data.rssi else 0 %}
