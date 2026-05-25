@@ -592,7 +592,7 @@ def process_batch(user_id, filepaths, ts):
         "reasoning": reasoning,
         "confidence": confidence, 
         "verdict": verdict,
-        "twin": json.dumps(twin, indent=2) if twin else None, 
+        "twin": twin,  # Save as dict for direct template access
         "gpt_res": gpt_r,
         "claude_res": claude_r
     })

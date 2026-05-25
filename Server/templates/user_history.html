@@ -344,6 +344,64 @@
         }
 
         /* reasoning + confidence footer */
+        /* Twin Recon Visualizer */
+        .twin-recon {
+            background: rgba(0, 0, 0, 0.25);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        .twin-header {
+            background: rgba(56, 189, 248, 0.1);
+            color: var(--accent);
+            padding: 8px 12px;
+            font-size: 0.65rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+            border-bottom: 1px solid var(--glass-border);
+        }
+        .twin-content { padding: 15px; }
+        .twin-question {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-main);
+            margin-bottom: 15px;
+            line-height: 1.4;
+        }
+        .twin-section { margin-bottom: 15px; }
+        .twin-section-title {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            margin-bottom: 8px;
+            letter-spacing: 0.5px;
+        }
+        .twin-option-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 6px 0;
+            font-size: 0.85rem;
+            color: var(--text-dim);
+        }
+        .twin-checkbox { color: var(--accent); font-size: 0.8rem; margin-top: 2px; }
+        .twin-grid-split {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .twin-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+        .twin-chip {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .chip-slot { background: rgba(244, 114, 182, 0.1); color: var(--accent-magenta); border-color: rgba(244, 114, 182, 0.2); }
+        .chip-item { background: rgba(56, 189, 248, 0.1); color: var(--accent); border-color: rgba(56, 189, 248, 0.2); }
+
         .ai-footer {
             border-top: 1px solid var(--glass-border);
             padding-top: 12px;
@@ -593,13 +651,55 @@
             {% endif %}
 
             <!-- Comparison Block -->
-            <div class="comparison-block">
-                {% if entry.twin %}
-                <div style="margin-bottom: 12px; padding: 10px; background: rgba(0,0,0,0.2); border-left: 2px solid var(--accent); font-family: monospace; font-size: 0.7rem; white-space: pre-wrap; color: var(--text-main);">
-<b>🧬 DIGITAL TWIN (Extracted Structure):</b>
-{{ entry.twin }}
+            <!-- Digital Twin Reconstruction (Blueprint) -->
+            {% if entry.twin %}
+            <div class="twin-recon">
+              <div class="twin-header">🏗️ PAGE RECONSTRUCTION (DIGITAL TWIN)</div>
+              <div class="twin-content">
+                <div class="twin-question">{{ entry.twin.get('questionText', 'N/A') }}</div>
+                
+                {% if entry.twin.get('options') %}
+                <div class="twin-section">
+                  <div class="twin-section-title">Options</div>
+                  <div class="twin-options">
+                    {% for opt in entry.twin.options %}
+                    <div class="twin-option-item">
+                      <span class="twin-checkbox">🔲</span>
+                      <span class="twin-opt-text">{{ opt.text }}</span>
+                    </div>
+                    {% endfor %}
+                  </div>
                 </div>
                 {% endif %}
+
+                {% if entry.twin.get('slots') or entry.twin.get('items') %}
+                <div class="twin-grid-split">
+                  {% if entry.twin.get('slots') %}
+                  <div class="twin-section">
+                    <div class="twin-section-title">Drop Slots</div>
+                    <div class="twin-chips">
+                      {% for slot in entry.twin.slots %}
+                      <span class="twin-chip chip-slot">{{ slot.label or 'Slot ' ~ loop.index }}</span>
+                      {% endfor %}
+                    </div>
+                  </div>
+                  {% endif %}
+                  
+                  {% if entry.twin.get('items') %}
+                  <div class="twin-section">
+                    <div class="twin-section-title">Draggable Items</div>
+                    <div class="twin-chips">
+                      {% for item in entry.twin.items %}
+                      <span class="twin-chip chip-item">{{ item.text }}</span>
+                      {% endfor %}
+                    </div>
+                  </div>
+                  {% endif %}
+                </div>
+                {% endif %}
+              </div>
+            </div>
+            {% endif %}
                 <div class="comp-item">
                     <span class="comp-label">GPT-4o</span>
                     <span class="comp-val">{{ entry.gpt_res.answer if entry.gpt_res and entry.gpt_res.answer else '✗' }}</span>
