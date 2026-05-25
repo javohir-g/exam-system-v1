@@ -590,6 +590,7 @@
 <!-- CHAT FEED -->
 <div class="chat-feed" id="chat-box">
     {% for entry in history %}
+    {% if entry is mapping and entry.timestamp %}
     <div class="entry">
         <!-- Images -->
         <div class="upload-wrap">
