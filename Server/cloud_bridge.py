@@ -513,8 +513,8 @@ def process_batch(user_id, filepaths, ts):
             reasoning = final.get("reasoning", "OK")
             confidence = final.get("confidence", 0.0)
             verdict = "recon_solved"
-            # Populate for UI comparison block
-            gpt_r = {"reasoning": "Digital Twin Extracted", "confidence": 1.0, "answer": "TWIN"}
+            # Populate for UI comparison block (GPT acted as Reconstructor)
+            gpt_r = {"reasoning": "Page Structure Extracted (Digital Twin)", "confidence": 1.0, "answer": "RECON"}
             claude_r = final
 
             # ── Step 3: Optional Hybrid Verification if confidence is low ────
