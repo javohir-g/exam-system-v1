@@ -663,7 +663,7 @@
                 <div class="twin-section">
                   <div class="twin-section-title">Options</div>
                   <div class="twin-options">
-                    {% for opt in entry.twin.options %}
+                    {% for opt in entry.twin['options'] %}
                     <div class="twin-option-item">
                       <span class="twin-checkbox">🔲</span>
                       <span class="twin-opt-text">{{ opt.text }}</span>
@@ -679,7 +679,7 @@
                   <div class="twin-section">
                     <div class="twin-section-title">Drop Slots</div>
                     <div class="twin-chips">
-                      {% for slot in entry.twin.slots %}
+                      {% for slot in entry.twin['slots'] %}
                       <span class="twin-chip chip-slot">{{ slot.label or 'Slot ' ~ loop.index }}</span>
                       {% endfor %}
                     </div>
@@ -690,7 +690,7 @@
                   <div class="twin-section">
                     <div class="twin-section-title">Draggable Items</div>
                     <div class="twin-chips">
-                      {% for item in entry.twin.items %}
+                      {% for item in entry.twin['items'] %}
                       <span class="twin-chip chip-item">{{ item.text }}</span>
                       {% endfor %}
                     </div>
