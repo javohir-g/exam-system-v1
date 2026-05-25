@@ -746,15 +746,19 @@ def dashboard():
 
 @app.route("/user/<user_id>")
 def user_history(user_id):
-    now = time.time()
-    uid_str = str(user_id)
-    data = user_data.get(uid_str, {"history": [], "last_seen": "Never", "last_img": None}).copy()
-    data["esp_online"] = (now - heartbeats.get(uid_str, 0)) < 12
-    
-    history = data.get("history", [])
-    if not isinstance(history, list): history = []
-    
-    return render_template("user_history.html", uid=uid_str, history=history, users={uid_str: data})
+    try:
+        now = time.time()
+        uid_str = str(user_id)
+        data = user_data.get(uid_str, {"history": [], "last_seen": "Never", "last_img": None}).copy()
+        data["esp_online"] = (now - heartbeats.get(uid_str, 0)) < 12
+        
+        history = data.get("history", [])
+        if not isinstance(history, list): history = []
+        
+        return render_template("user_history.html", uid=uid_str, history=history, users={uid_str: data})
+    except Exception as e:
+        import traceback
+        return f"<pre>DIAGNOSTIC (RE-RUN):\n{traceback.format_exc()}</pre>", 500
 
 @app.route("/screenshots/<path:filename>")
 def serve_screenshot(filename):
