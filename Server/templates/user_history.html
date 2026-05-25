@@ -652,7 +652,7 @@
 
             <!-- Comparison Block -->
             <!-- Digital Twin Reconstruction (Blueprint) -->
-            {% if entry.twin %}
+            {% if entry.twin and entry.twin is mapping %}
             <div class="twin-recon">
               <div class="twin-header">🏗️ PAGE RECONSTRUCTION (DIGITAL TWIN)</div>
               <div class="twin-content">
