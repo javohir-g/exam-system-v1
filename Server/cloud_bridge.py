@@ -513,12 +513,16 @@ def process_batch(user_id, filepaths, ts):
             reasoning = final.get("reasoning", "OK")
             confidence = final.get("confidence", 0.0)
             verdict = "recon_solved"
+            # Populate for UI comparison block
+            gpt_r = {"reasoning": "Digital Twin Extracted", "confidence": 1.0, "answer": "TWIN"}
+            claude_r = final
 
             # ── Step 3: Optional Hybrid Verification if confidence is low ────
             if confidence < 0.75:
                 verified, v_err = call_claude_reasoner_with_image(filepaths, twin)
                 if verified and verified.get("confidence", 0.0) > confidence:
                     final = verified
+                    claude_r = verified
                     confidence = final.get("confidence", 0.0)
                     verdict = "hybrid_verified"
                     print(f"[*] Hybrid upgrade: confidence {confidence}", flush=True)
@@ -544,21 +548,27 @@ def process_batch(user_id, filepaths, ts):
             reasoning = f"Fallback fail: GPT={gpt_err}, CL={cl_err}"
 
     # ── Step 4: Build answer queue and notify ────────────────────────────────
+    task_type = "err"
+    answer_val = 0
+    matches = []
+    subtype = "n/a"
+    tg_answer = "Error"
+
     if final:
         task_type = final.get("type", "choice")
-        confidence = final.get("confidence", 0.0)
+        subtype = final.get("subtype", "n/a")
         
         if task_type == "drag":
             matches = final.get("matches", [])
-            sorted_matches = sorted(matches, key=lambda x: x.get('d', 0))
-            for i, m in enumerate(sorted_matches):
+            sorted_m = sorted(matches, key=lambda x: x.get('d', 0))
+            for i, m in enumerate(sorted_m):
                 user_queue.append({"count": m.get("s", 0), "count2": 0, "cmd_id": ts + i})
-            tg_answer = "\n".join([f"{m.get('d')}) {m.get('s')}" for m in sorted_matches])
+            tg_answer = "\n".join([f"{m.get('d')}) {m.get('s')}" for m in sorted_m])
         elif task_type == "number":
             answer_val = final.get("answer", 0)
             user_queue.append({"count": answer_val, "count2": 0, "cmd_id": ts, "is_num": True})
             tg_answer = str(answer_val)
-        else:
+        else: # choice
             answer_val = final.get("answer", 0)
             user_queue.append({"count": answer_val, "count2": 0, "cmd_id": ts})
             letters = {1: "A", 2: "B", 3: "C", 4: "D", 5: "E", 6: "F"}
@@ -567,25 +577,30 @@ def process_batch(user_id, filepaths, ts):
         answer_queue[user_id] = user_queue
         print(f"[Final] User {user_id} -> {tg_answer} (Verdict: {verdict})", flush=True)
 
-    # Legacy formatting for TG
+    # Save to history for Dashboard
     if user_id not in user_data: user_data[user_id] = {"history": []}
     filenames = [os.path.basename(f) for f in filepaths]
     
     user_data[user_id]["history"].append({
-        "timestamp": get_now(), "filenames": filenames,
-        "task_type": final.get("type", "choice") if final else "err",
-        "answer": tg_answer, "reasoning": reasoning,
-        "confidence": confidence, "verdict": verdict,
-        "twin": twin  # Save digital twin for dashboard visualization
+        "timestamp": get_now(), 
+        "filenames": filenames,
+        "task_type": task_type,
+        "answer": tg_answer, 
+        "answer_val": answer_val,
+        "matches": matches,
+        "subtype": subtype,
+        "reasoning": reasoning,
+        "confidence": confidence, 
+        "verdict": verdict,
+        "twin": json.dumps(twin, indent=2) if twin else None, 
+        "gpt_res": gpt_r,
+        "claude_res": claude_r
     })
     
-    # Small wrapper to call TG with minimal arguments for now or keep old signature
+    # Small wrapper to call TG
     send_to_telegram(
         user_id, filepaths, 
-        final.get("type", "choice") if final else "choice",
-        final.get("answer", 0) if final else 0,
-        final.get("matches", []) if final else [],
-        final.get("subtype", "n/a") if final else "n/a",
+        task_type, answer_val, matches, subtype,
         reasoning, confidence,
         gpt_res=gpt_r, claude_res=claude_r, verdict=verdict
     )
