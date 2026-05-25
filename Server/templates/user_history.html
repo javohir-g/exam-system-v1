@@ -594,6 +594,12 @@
 
             <!-- Comparison Block -->
             <div class="comparison-block">
+                {% if entry.twin %}
+                <div style="margin-bottom: 12px; padding: 10px; background: rgba(0,0,0,0.2); border-left: 2px solid var(--accent); font-family: monospace; font-size: 0.7rem; white-space: pre-wrap; color: var(--text-main);">
+<b>🧬 DIGITAL TWIN (Extracted Structure):</b>
+{{ entry.twin }}
+                </div>
+                {% endif %}
                 <div class="comp-item">
                     <span class="comp-label">GPT-4o</span>
                     <span class="comp-val">{{ entry.gpt_res.answer if entry.gpt_res and entry.gpt_res.answer else '✗' }}</span>

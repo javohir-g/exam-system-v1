@@ -64,87 +64,78 @@ load_data()
 
 # --- TELEGRAM NOTIFICATIONS ---
 def _build_tg_caption(user_id, task_type, answer_val, matches, subtype, reasoning, confidence, gpt_res=None, claude_res=None, verdict="—"):
-    """Build a structured Telegram caption with separate model outputs."""
+    """Build a structured, premium Telegram caption for exam results."""
     LETTERS = {1: "A", 2: "B", 3: "C", 4: "D", 5: "E", 6: "F"}
     tg_mention = tg_users.get(str(user_id), "").replace("_", "\\_")
     mention_line = f"\n👤 {tg_mention}" if tg_mention else ""
+    
     conf_pct = int(round(confidence * 100))
+    conf_char = "🟢" if conf_pct > 85 else "🟡" if conf_pct > 65 else "🔴"
     conf_bar = "█" * (conf_pct // 10) + "░" * (10 - conf_pct // 10)
+    
     reasoning_esc = str(reasoning).replace("_", "\\_")
-
-    header = f"📡 *NODE {user_id}*{mention_line}\n"
+    
+    # Pipeline Indicator
+    pipeline_icon = "🧬" if "recon" in verdict or "hybrid" in verdict else "👁"
+    pipeline_name = "Semantic Recon" if pipeline_icon == "🧬" else "Direct Vision"
+    
+    header = (
+        f"📡 *NODE {user_id}* {mention_line}\n"
+        f"{pipeline_icon} _Pipeline: {pipeline_name}_"
+    )
 
     def _fmt_model(res, label):
         if not res or res.get("confidence", 0) <= 0:
-            return f"{label}: ✗ _No answer_"
-        
+            return f"{label}: ✗ —"
         t = res.get("type", "?")
         ans = res.get("answer", "?")
         if t == "drag":
             mx = res.get("matches", [])
             pairs = ",".join(f"{m.get('s')}→{m.get('d')}" for m in mx[:2])
-            val = f"[{pairs}{'…' if len(mx)>2 else ''}] (drag)"
+            val = f"[{pairs}{'…' if len(mx)>2 else ''}]"
         elif t == "choice":
             val = f"{ans} ({LETTERS.get(ans, '?')})"
         else:
             val = str(ans)
-        
-        re_msg = str(res.get("reasoning", "OK")).replace("_", "\\_")
-        return f"{label}: *{val}* _({re_msg})_"
+        return f"{label}: *{val}*"
 
     gpt_line    = _fmt_model(gpt_res,    "🤖 GPT")
     claude_line = _fmt_model(claude_res, "🤖 CL")
-    verdict_line = f"⚖️ Verdict: *{verdict}*"
+    verdict_info = f"⚖️ *{verdict.upper()}*"
 
+    # Task Header
+    task_label = {
+        "choice": "🎯 MULTIPLE CHOICE",
+        "drag":   {
+            "matching": "🔗 MATCHING", "ordering": "🔢 ORDERING",
+            "fill_gap": "✏️ FILL GAP", "category": "📂 CATEGORY"
+        }.get(subtype, "🖱 DRAG & DROP"),
+        "number": "🔢 NUMERIC ANSWER"
+    }.get(task_type, "❓ UNKNOWN")
+
+    # Content building
+    body = ""
     if task_type == "drag":
-        subtype_label = {
-            "matching": "🔗 Matching", "ordering": "🔢 Ordering",
-            "fill_gap": "✏️ Fill Gap", "category": "📂 Category"
-        }.get(subtype, "🖱 Drag & Drop")
         sorted_m = sorted(matches or [], key=lambda x: x.get('d', 0))
-        rows = "\n".join(
-            f"  `Slot {m.get('d')}` ← *Item {m.get('s')}*"
-            for m in sorted_m
-        )
-        return (
-            header +
-            f"*{subtype_label}*\n"
-            f"━━━━━━━━━━━━━━━━\n"
-            f"{rows}\n\n"
-            f"{gpt_line}\n"
-            f"{claude_line}\n"
-            f"{verdict_line}\n"
-            f"━━━━━━━━━━━━━━━━\n"
-            f"🧠 {reasoning_esc}\n"
-            f"📊 `{conf_bar}` {conf_pct}%"
-        )
+        rows = "\n".join(f"  `Slot {m.get('d')}` ← *Item {m.get('s')}*" for m in sorted_m)
+        body = f"{rows}\n"
     elif task_type == "number":
-        return (
-            header +
-            f"*🔢 Numeric Answer*\n"
-            f"━━━━━━━━━━━━━━━━\n"
-            f"   `{answer_val}`\n\n"
-            f"{gpt_line}\n"
-            f"{claude_line}\n"
-            f"{verdict_line}\n"
-            f"━━━━━━━━━━━━━━━━\n"
-            f"🧠 {reasoning_esc}\n"
-            f"📊 `{conf_bar}` {conf_pct}%"
-        )
+        body = f"   Ответ: `{answer_val}`\n"
     else:  # choice
         letter = LETTERS.get(answer_val, "?")
-        return (
-            header +
-            f"*🎯 Multiple Choice*\n"
-            f"━━━━━━━━━━━━━━━━\n"
-            f"   ✅ *{letter}* (option {answer_val})\n\n"
-            f"{gpt_line}\n"
-            f"{claude_line}\n"
-            f"{verdict_line}\n"
-            f"━━━━━━━━━━━━━━━━\n"
-            f"🧠 {reasoning_esc}\n"
-            f"📊 `{conf_bar}` {conf_pct}%"
-        )
+        body = f"   ✅ *{letter}* (option {answer_val})\n"
+
+    return (
+        f"{header}\n"
+        f"━━━━━━━━━━━━━━━━\n"
+        f"*{task_label}*\n\n"
+        f"{body}\n"
+        f"━━━━━━━━━━━━━━━━\n"
+        f"{gpt_line}  {claude_line}\n"
+        f"Status: {verdict_info}\n"
+        f"📊 `{conf_bar}` {conf_pct}% {conf_char}\n"
+        f"🧠 _{reasoning_esc}_"
+    )
 
 
 def send_to_telegram(user_id, filepaths, task_type, answer_val, matches, subtype, reasoning, confidence, gpt_res=None, claude_res=None, verdict="—"):
@@ -286,260 +277,277 @@ def esp_report():
     return "OK", 200
 
 
-# ─── SHARED EXAM PROMPT ──────────────────────────────────────────────────────
-def _build_exam_prompt(n_images):
+# ─── SEMANTIC RECONSTRUCTION PROMPTS ─────────────────────────────────────────
+
+def _build_reconstruction_prompt(n_images):
+    """Prompt for GPT-4o to extract ONLY the structure of the exam page."""
     prefix = (
-        f"You are an expert exam analyst examining {n_images} screenshot(s) "
-        f"that may show different parts of the SAME question. Study ALL images together.\n\n"
-    ) if n_images > 1 else "You are an expert exam analyst examining a screenshot of an exam question.\n\n"
+        f"You are a PAGE SCANNER. Your ONLY job is to extract structure from {n_images} screenshot(s) "
+        f"that may show different parts of the SAME question. Study ALL images together.\n"
+        "Do NOT solve the question. Do NOT guess answers.\n\n"
+    ) if n_images > 1 else "You are a PAGE SCANNER. Extract structure from the screenshot. Do NOT solve/guess.\n\n"
+
     return (
         prefix +
-        "═══ STEP 1 — IDENTIFY TASK TYPE ═══\n"
-        "Carefully look at the interface and pick ONE type:\n"
-        "  'choice'  — radio/checkbox options labeled A B C D E F (or 1 2 3 4 5)\n"
-        "  'drag'    — any task where elements must be MOVED: matching pairs, ordering,\n"
-        "              fill-in-the-blank with draggable tiles, sorting into categories\n"
-        "  'number'  — open numeric input field (type a number as the answer)\n\n"
+        "═══ TASK: EXTRACT ELEMENTS ═══\n"
+        "1. questionText: Full text of the question (copy verbatim, no matter the language)\n"
+        "2. taskType: Pick ONE: 'choice' | 'drag' | 'number'\n"
+        "3. For 'choice': list all radio/checkbox options (index 1=A, 2=B...):\n"
+        "   options: [{\"id\": 1, \"text\": \"...\"}]\n"
+        "4. For 'drag': list all SLOTS (drop zones, top-to-bottom) and ITEMS (draggable, left-to-right):\n"
+        "   slots: [{\"id\": 1, \"label\": \"...\"}]\n"
+        "   items: [{\"id\": 1, \"text\": \"...\"}]\n"
+        "5. subtype: 'matching' | 'ordering' | 'fill_gap' | 'category' | 'n/a'\n\n"
 
-        "═══ STEP 2 — ANSWER RULES BY TYPE ═══\n\n"
-
-        "FOR 'choice':\n"
-        "  • Put the option index in 'answer': 1=A, 2=B, 3=C, 4=D, 5=E, 6=F\n\n"
-
-        "FOR 'drag' — follow ALL steps below carefully:\n"
-        "  1. READ THE CONTENT: Read every slot label and every draggable item label carefully.\n"
-        "  2. DETECT SUBTYPE:\n"
-        "       • MATCHING  — two columns, connect left item to right item\n"
-        "       • ORDERING  — put items in correct sequence (1st, 2nd, 3rd…)\n"
-        "       • FILL GAP  — drag tiles into blank spaces inside a text/diagram\n"
-        "       • CATEGORY  — sort items into labeled groups/buckets\n"
-        "  3. NUMBER THE SLOTS (destination 'd'): count empty drop-zones\n"
-        "       strictly TOP-TO-BOTTOM, LEFT column before RIGHT column. Start at 1.\n"
-        "  4. NUMBER THE SOURCE ITEMS (source 's'): count draggable buttons/tiles\n"
-        "       strictly LEFT-TO-RIGHT, TOP row before BOTTOM row. Start at 1.\n"
-        "  5. MATCH SEMANTICALLY: for each slot d=1,2,3… choose the source 's' whose\n"
-        "       TEXT/MEANING best fits. Do NOT guess by visual position alone.\n"
-        "  6. DISTRACTORS: there may be MORE source items than slots (extra wrong options).\n"
-        "       Each source item should be used AT MOST ONCE.\n"
-        "  7. If a slot has NO correct match among the sources, set s=0.\n"
-        "  8. Output ONE entry per slot, sorted by 'd' ascending:\n"
-        "       \"matches\": [{\"s\": <src_idx>, \"d\": <slot_idx>}, ...]\n\n"
-
-        "FOR 'number':\n"
-        "  • Put the integer answer in 'answer' (e.g. 42 or 235).\n\n"
-
-        "═══ STEP 3 — QUALITY CHECKS ═══\n"
-        "  ✓ Every slot has exactly one entry in 'matches'\n"
-        "  ✓ No source index ('s') is reused (unless explicitly the same tile appears twice)\n"
-        "  ✓ 'confidence' reflects true certainty (0.0–1.0); use <0.6 if unsure\n"
-        "  ✓ 'reasoning' is 1–5 words in RUSSIAN describing your key reasoning\n\n"
-
-        "═══ OUTPUT — RAW JSON ONLY, no markdown ═══\n"
-        "{\"type\": \"choice|drag|number\", \"subtype\": \"matching|ordering|fill_gap|category|n/a\",\n"
-        " \"reasoning\": \"...\", \"answer\": <int>, \"confidence\": <float>,\n"
-        " \"matches\": [{\"s\":<int>, \"d\":<int>}, ...]}"
+        "═══ RULES ═══\n"
+        "• Copy text EXACTLY — include typos or symbols\n"
+        "• For 'drag': slot ID d=1,2,3... top-to-bottom; item ID s=1,2,3... left-to-right\n"
+        "• If a button has no text, describe its icon in brackets: [plus icon]\n"
+        "• Respond ONLY with raw JSON:\n\n"
+        "{\"taskType\": \"choice|drag|number\", \"subtype\": \"...\", \"questionText\": \"...\", "
+        "\"options\": [], \"slots\": [], \"items\": []}"
     )
+
+def _build_reasoning_prompt(digital_twin):
+    """Prompt for Claude to solve the logical task based on extracted structure."""
+    dt_json = json.dumps(digital_twin, ensure_ascii=False, indent=2)
+    return (
+        "You are an EXPERT EXAMINER. A page scanner already extracted the question structure. "
+        "Your job is to solve it correctly.\n\n"
+        f"═══ QUESTION STRUCTURE ═══\n{dt_json}\n\n"
+
+        "═══ SOLVING RULES ═══\n"
+        "• 'choice': Pick the correct option. Put its id (1, 2, 3...) in 'answer'.\n"
+        "• 'drag': Match every slot to the best item. Output 'matches': [{\"s\": item_id, \"d\": slot_id}].\n"
+        "  - Use each item ONLY ONCE unless it's a category task.\n"
+        "  - If no match fits a slot, set s=0.\n"
+        "• 'number': Calculate the correct integer and put it in 'answer'.\n\n"
+
+        "═══ QUALITY ═══\n"
+        "• Watch for 'NOT' or 'НЕ' in questions — think carefully.\n"
+        "• 'confidence': 0.0 to 1.0 (your real certainty).\n"
+        "• 'reasoning': 2-6 words in RUSSIAN.\n\n"
+        "Respond ONLY with raw JSON:\n"
+        "{\"type\": \"choice|drag|number\", \"subtype\": \"...\", \"answer\": <int>, "
+        "\"confidence\": <float>, \"reasoning\": \"...\", "
+        "\"matches\": [{\"s\": <int>, \"d\": <int>}]}"
+    )
+
+# Old prompt kept for legacy fallback
+def _build_exam_prompt(n_images):
+    """Old prompt for legacy direct vision fallback."""
+    prefix = (
+        f"You are an expert exam analyst examining {n_images} screenshot(s). "
+    ) if n_images > 1 else "You are an expert exam analyst. "
+    return prefix + "Analyze the question and return raw JSON: {\"type\": \"choice|drag|number\", \"answer\": <int>, \"confidence\": <float>, \"reasoning\": \"...\", \"matches\": []}"
 
 def _parse_ai_json(raw_text):
     """Extract and parse JSON from raw AI response text."""
     m = re.search(r'\{.*\}', raw_text, re.DOTALL)
     return json.loads((m.group(0) if m else raw_text).strip())
 
-# ─── GPT VISION CALL ─────────────────────────────────────────────────────────
-def call_gpt_vision(filepaths):
-    """Send images to GPT-4o Vision and return parsed JSON dict."""
+# ─── SEMANTIC RECONSTRUCTOR AI CALLS ─────────────────────────────────────────
+
+def call_gpt_reconstructor(filepaths):
+    """GPT-4o Vision: Extracts structure (digital twin) from screenshots."""
     api_key = os.environ.get("OPENAI_API_KEY", "").strip()
     model   = os.environ.get("OPENAI_MODEL", "gpt-4o").strip()
-    if not api_key:
-        return None, "No OpenAI key"
+    if not api_key: return None, "No API key"
     try:
         import openai
         client = openai.OpenAI(api_key=api_key)
-        messages_content = []
-        for fpath in filepaths:
-            with open(fpath, "rb") as f:
+        content = []
+        for fp in filepaths:
+            with open(fp, "rb") as f:
                 b64 = base64.b64encode(f.read()).decode()
-            messages_content.append({
-                "type": "image_url",
-                "image_url": {"url": f"data:image/jpeg;base64,{b64}", "detail": "high"}
-            })
-        messages_content.append({"type": "text", "text": _build_exam_prompt(len(filepaths))})
-
-        resp = client.chat.completions.create(
-            model=model,
-            max_tokens=1024,
-            messages=[{"role": "user", "content": messages_content}]
-        )
-        raw = resp.choices[0].message.content.strip()
-        parsed = _parse_ai_json(raw)
-        print(f"[GPT]  raw={raw[:120]}", flush=True)
+            content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}", "detail": "high"}})
+        content.append({"type": "text", "text": _build_reconstruction_prompt(len(filepaths))})
+        
+        resp = client.chat.completions.create(model=model, messages=[{"role": "user", "content": content}], max_tokens=1024)
+        parsed = _parse_ai_json(resp.choices[0].message.content.strip())
+        print(f"[GPT-Reconfig] Extracted structure for {len(filepaths)} images", flush=True)
         return parsed, None
     except Exception as e:
-        print(f"[!] GPT Vision error: {e}", flush=True)
+        print(f"[!] Reconstructor Error: {e}", flush=True)
         return None, str(e)
 
-# ─── CLAUDE VISION CALL ──────────────────────────────────────────────────────
-def call_claude_vision(filepaths):
-    """Send images to Claude Vision and return parsed JSON dict."""
+def call_claude_reasoner(digital_twin):
+    """Claude 3.5 Sonnet: Solves the task based on TEXT structure (no vision)."""
     api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip().replace('"','').replace("'","")
     model   = os.environ.get("CLAUDE_MODEL", "claude-3-5-sonnet-20240620").strip()
-    if not api_key or api_key == "your_key_here":
-        return None, "No Anthropic key"
+    if not api_key or api_key == "your_key_here": return None, "No API key"
     try:
         import anthropic as anthropic_sdk
-        content_blocks = []
-        for fpath in filepaths:
-            with open(fpath, "rb") as f:
-                b64 = base64.b64encode(f.read()).decode()
-            content_blocks.append({
-                "type": "image",
-                "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}
-            })
-        content_blocks.append({"type": "text", "text": _build_exam_prompt(len(filepaths))})
-
-        client  = anthropic_sdk.Anthropic(api_key=api_key)
+        client = anthropic_sdk.Anthropic(api_key=api_key)
         message = client.messages.create(
             model=model, max_tokens=1024,
-            messages=[{"role": "user", "content": content_blocks}]
+            messages=[{"role": "user", "content": _build_reasoning_prompt(digital_twin)}]
         )
-        raw = message.content[0].text.strip()
-        parsed = _parse_ai_json(raw)
-        print(f"[Claude] raw={raw[:120]}", flush=True)
+        parsed = _parse_ai_json(message.content[0].text.strip())
+        print(f"[Claude-Reasoner] Solved based on twin. Conf={parsed.get('confidence')}", flush=True)
         return parsed, None
     except Exception as e:
-        print(f"[!] Claude Vision error: {e}", flush=True)
+        print(f"[!] Reasoner Error: {e}", flush=True)
         return None, str(e)
 
-# ─── GPT VERIFIER ────────────────────────────────────────────────────────────
-def call_gpt_verifier(filepaths, gpt_result, claude_result):
-    """GPT receives both answers + images, compares, and returns the best final JSON."""
+def call_claude_reasoner_with_image(filepaths, digital_twin):
+    """Claude 3.5 Sonnet: Solves task seeing BOTH the image and the extracted structure."""
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip().replace('"','').replace("'","")
+    model   = os.environ.get("CLAUDE_MODEL", "claude-3-5-sonnet-20240620").strip()
+    if not api_key: return None, "No API key"
+    try:
+        import anthropic as anthropic_sdk
+        client = anthropic_sdk.Anthropic(api_key=api_key)
+        content = []
+        for fp in filepaths:
+            with open(fp, "rb") as f:
+                b64 = base64.b64encode(f.read()).decode()
+            content.append({"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}})
+        
+        prompt = (
+            "You are an EXPERT JUDGE. You have both the screenshot and a structured 'digital twin' "
+            "representation of the question.\n\n"
+            f"DIGITAL TWIN:\n{json.dumps(digital_twin, ensure_ascii=False, indent=2)}\n\n"
+            "If the digital twin is accurate, use it to solve. If it missed something, use the image. "
+            "Output final answer in standard JSON format."
+        )
+        content.append({"type": "text", "text": prompt})
+        
+        message = client.messages.create(model=model, max_tokens=1024, messages=[{"role": "user", "content": content}])
+        parsed = _parse_ai_json(message.content[0].text.strip())
+        print(f"[Claude-Hybrid] Verified answer. Conf={parsed.get('confidence')}", flush=True)
+        return parsed, None
+    except Exception as e:
+        print(f"[!] Hybrid Error: {e}", flush=True)
+        return None, str(e)
+
+# ─── LEGACY VISION CALLS ─────────────────────────────────────────────────────
+
+def call_gpt_vision(filepaths):
+    """Send images to GPT-4o Vision and return parsed JSON dict (Legacy)."""
     api_key = os.environ.get("OPENAI_API_KEY", "").strip()
     model   = os.environ.get("OPENAI_MODEL", "gpt-4o").strip()
-    if not api_key:
-        return None, "No OpenAI key for verifier"
+    if not api_key: return None, "No API key"
     try:
         import openai
         client = openai.OpenAI(api_key=api_key)
-
-        messages_content = []
-        for fpath in filepaths:
-            with open(fpath, "rb") as f:
+        content = []
+        for fp in filepaths:
+            with open(fp, "rb") as f:
                 b64 = base64.b64encode(f.read()).decode()
-            messages_content.append({
-                "type": "image_url",
-                "image_url": {"url": f"data:image/jpeg;base64,{b64}", "detail": "high"}
-            })
-
-        verifier_prompt = (
-            "You are a FINAL JUDGE for an exam question. "
-            "Two AI models already analyzed the image(s) independently.\n\n"
-            f"Model A (GPT):    {json.dumps(gpt_result,    ensure_ascii=False)}\n"
-            f"Model B (Claude): {json.dumps(claude_result, ensure_ascii=False)}\n\n"
-            "YOUR TASK\n"
-            "Re-examine the image(s) carefully, then produce the BEST final answer.\n\n"
-            "GENERAL RULES\n"
-            "• If both models agree → confirm (verdict='agreed').\n"
-            "• If they disagree → reason from the image which is correct\n"
-            "  (verdict='gpt_wins' or 'claude_wins').\n"
-            "• If both are partially right → synthesize the best combination\n"
-            "  (verdict='synthesized').\n\n"
-            "DRAG & DROP SPECIAL RULES (apply when type='drag')\n"
-            "• Compare the models SLOT BY SLOT (d=1, d=2, …).\n"
-            "• For each slot where they disagree: re-read the slot label and both\n"
-            "  candidate source items; pick the semantically correct one.\n"
-            "• You MAY take slot assignments from different models for different slots\n"
-            "  (mixed verdict → use 'synthesized').\n"
-            "• Ensure no source index ('s') is reused across slots.\n"
-            "• Keep all slots present in 'matches', sorted by 'd' ascending.\n\n"
-            "OUTPUT RULES\n"
-            "• 'reasoning': 1–5 words in Russian.\n"
-            "• 'verdict': 'agreed' | 'gpt_wins' | 'claude_wins' | 'synthesized'\n"
-            "• Preserve 'subtype' field if present in inputs.\n"
-            "• Respond ONLY with raw JSON — no markdown, no explanations.\n\n"
-            "{\"type\": \"choice|drag|number\", \"subtype\": \"...\", "
-            "\"reasoning\": \"...\", \"verdict\": \"...\",\n"
-            " \"answer\": <int>, \"confidence\": <float>,\n"
-            " \"matches\": [{\"s\":<int>, \"d\":<int>}, ...]}"
-        )
-        messages_content.append({"type": "text", "text": verifier_prompt})
-
-        resp = client.chat.completions.create(
-            model=model, max_tokens=1024,
-            messages=[{"role": "user", "content": messages_content}]
-        )
-        raw = resp.choices[0].message.content.strip()
-        parsed = _parse_ai_json(raw)
-        print(f"[GPT-Verifier] verdict={parsed.get('verdict','?')} raw={raw[:120]}", flush=True)
-        return parsed, None
+            content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}", "detail": "high"}})
+        content.append({"type": "text", "text": _build_exam_prompt(len(filepaths))})
+        resp = client.chat.completions.create(model=model, messages=[{"role": "user", "content": content}], max_tokens=1024)
+        return _parse_ai_json(resp.choices[0].message.content.strip()), None
     except Exception as e:
-        print(f"[!] GPT Verifier error: {e}", flush=True)
+        return None, str(e)
+
+def call_claude_vision(filepaths):
+    """Send images to Claude Vision and return parsed JSON dict (Legacy)."""
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip().replace('"','').replace("'","")
+    model   = os.environ.get("CLAUDE_MODEL", "claude-3-5-sonnet-20240620").strip()
+    if not api_key: return None, "No API key"
+    try:
+        import anthropic as anthropic_sdk
+        client = anthropic_sdk.Anthropic(api_key=api_key)
+        content = []
+        for fp in filepaths:
+            with open(fp, "rb") as f:
+                b64 = base64.b64encode(f.read()).decode()
+            content.append({"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}})
+        content.append({"type": "text", "text": _build_exam_prompt(len(filepaths))})
+        message = client.messages.create(model=model, max_tokens=1024, messages=[{"role": "user", "content": content}])
+        return _parse_ai_json(message.content[0].text.strip()), None
+    except Exception as e:
+        return None, str(e)
+
+# ─── LEGACY VERIFIER ─────────────────────────────────────────────────────────
+
+def call_gpt_verifier(filepaths, gpt_result, claude_result):
+    """GPT receives both answers + images, compares, and returns the best final JSON (Legacy)."""
+    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    model   = os.environ.get("OPENAI_MODEL", "gpt-4o").strip()
+    if not api_key: return None, "No API key"
+    try:
+        import openai
+        client = openai.OpenAI(api_key=api_key)
+        content = []
+        for fp in filepaths:
+            with open(fp, "rb") as f:
+                b64 = base64.b64encode(f.read()).decode()
+            content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}", "detail": "high"}})
+        
+        prompt = (
+            "Final judge for exam question. Compare Model A and B.\n"
+            f"A: {json.dumps(gpt_result)}\nB: {json.dumps(claude_result)}\n"
+            "Return best JSON."
+        )
+        content.append({"type": "text", "text": prompt})
+        resp = client.chat.completions.create(model=model, messages=[{"role": "user", "content": content}], max_tokens=1024)
+        return _parse_ai_json(resp.choices[0].message.content.strip()), None
+    except Exception as e:
         return None, str(e)
 
 # ─── MAIN BATCH PROCESSOR ────────────────────────────────────────────────────
 def process_batch(user_id, filepaths, ts):
-    """Parallel GPT + Claude → GPT Verifier → final answer."""
+    """Semantic Reconstruction: GPT (Eyes) -> Claude (Brain) pipeline."""
     print(f"[*] Processing batch for User {user_id}: {len(filepaths)} photo(s)", flush=True)
 
     tg_answer  = "Error"
-    reasoning  = "AI unavailable"
+    reasoning  = "AI pipeline failed"
     confidence = 0.0
     user_queue = []
+    final = None
+    gpt_r = None
+    claude_r = None
+    verdict = "—"
 
-    # ── Step 1: call GPT and Claude in PARALLEL ──────────────────────────────
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
-        fut_gpt    = pool.submit(call_gpt_vision,    filepaths)
-        fut_claude = pool.submit(call_claude_vision, filepaths)
-        gpt_result,    gpt_err    = fut_gpt.result()
-        claude_result, claude_err = fut_claude.result()
+    # ── Step 1: GPT Reconstruction (Digital Twin) ────────────────────────────
+    twin, twin_err = call_gpt_reconstructor(filepaths)
+    
+    if twin:
+        # ── Step 2: Claude Reasoning (Text-only) ─────────────────────────────
+        final, cl_err = call_claude_reasoner(twin)
+        
+        if final:
+            reasoning = final.get("reasoning", "OK")
+            confidence = final.get("confidence", 0.0)
+            verdict = "recon_solved"
 
-    print(f"[*] GPT result: {gpt_result}, Claude result: {claude_result}", flush=True)
-
-    # ── Step 2: decide which results to pass to verifier ────────────────────
-    both_failed = (gpt_result is None and claude_result is None)
-    if both_failed:
-        reasoning = f"GPT: {gpt_err} | Claude: {claude_err}"
-        print(f"[!] Both AI failed for User {user_id}", flush=True)
-    else:
-        # Fill in a stub if one side failed
-        stub = {"type": "choice", "answer": 0, "confidence": 0.0,
-                "reasoning": "N/A", "matches": []}
-        gpt_r    = gpt_result    if gpt_result    is not None else stub
-        claude_r = claude_result if claude_result is not None else stub
-
-        # ── Step 3: GPT Verifier ─────────────────────────────────────────────
-        # Only call verifier if BOTH models produced a real, useful answer
-        # A model "really answered" drag if it has >=1 match with confidence>0
-        # A model "really answered" choice/number if confidence>0
-        def _is_real_answer(r):
-            if r is None:
-                return False
-            if r.get("confidence", 0.0) <= 0.0:
-                return False
-            if r.get("type") == "drag" and not r.get("matches"):
-                return False  # empty matches = model failed on drag
-            return True
-
-        gpt_real    = _is_real_answer(gpt_result)
-        claude_real = _is_real_answer(claude_result)
-
-        if gpt_real and claude_real:
-            final, v_err = call_gpt_verifier(filepaths, gpt_r, claude_r)
-            if final is None:
-                # Verifier failed — fall back to GPT
-                final = gpt_r
-                print(f"[!] Verifier failed ({v_err}), using GPT answer", flush=True)
+            # ── Step 3: Optional Hybrid Verification if confidence is low ────
+            if confidence < 0.75:
+                verified, v_err = call_claude_reasoner_with_image(filepaths, twin)
+                if verified and verified.get("confidence", 0.0) > confidence:
+                    final = verified
+                    confidence = final.get("confidence", 0.0)
+                    verdict = "hybrid_verified"
+                    print(f"[*] Hybrid upgrade: confidence {confidence}", flush=True)
         else:
-            # Only one model gave a real answer — use it directly, no verifier
-            final = gpt_r if gpt_real else claude_r
-            winner = "GPT" if gpt_real else "Claude"
-            print(f"[*] Only {winner} gave real answer, skipping verifier", flush=True)
+            reasoning = f"Reasoner fail: {cl_err}"
+    else:
+        # ── FALLBACK: Old Parallel Vision Method ─────────────────────────────
+        print(f"[!] Reconstructor failed ({twin_err}), falling back to direct vision", flush=True)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            fut_gpt    = pool.submit(call_gpt_vision,    filepaths)
+            fut_claude = pool.submit(call_claude_vision, filepaths)
+            gpt_r, gpt_err = fut_gpt.result()
+            claude_r, cl_err = fut_claude.result()
+        
+        # Use simple fallback selection
+        if claude_r and claude_r.get("confidence", 0) > 0.5:
+            final = claude_r
+            verdict = "direct_claude"
+        elif gpt_r:
+            final = gpt_r
+            verdict = "direct_gpt"
+        else:
+            reasoning = f"Fallback fail: GPT={gpt_err}, CL={cl_err}"
 
-        # ── Step 4: build answer queue from final result ──────────────────────
-        task_type  = final.get("type", "choice")
-        reasoning  = final.get("reasoning", "OK")
+    # ── Step 4: Build answer queue and notify ────────────────────────────────
+    if final:
+        task_type = final.get("type", "choice")
         confidence = final.get("confidence", 0.0)
-        verdict    = final.get("verdict", "—")
-
+        
         if task_type == "drag":
             matches = final.get("matches", [])
             sorted_matches = sorted(matches, key=lambda x: x.get('d', 0))
@@ -556,57 +564,30 @@ def process_batch(user_id, filepaths, ts):
             letters = {1: "A", 2: "B", 3: "C", 4: "D", 5: "E", 6: "F"}
             tg_answer = f"{answer_val} ({letters.get(answer_val, '?')})"
 
-        # Add verdict + model summaries to reasoning for Telegram display
-        def _short_summary(r, label):
-            if r is None or r.get("confidence", 0) <= 0:
-                return f"{label}:✗"
-            t = r.get("type", "?")
-            if t == "drag":
-                mx = r.get("matches", [])
-                pairs = ",".join(f"{m.get('s')}→{m.get('d')}" for m in mx[:3])
-                return f"{label}:[{pairs}{'…' if len(mx)>3 else ''}]"
-            return f"{label}:{r.get('answer', '?')}"
-
-        gpt_summary    = _short_summary(gpt_result,    "GPT")
-        claude_summary = _short_summary(claude_result, "CL")
-        reasoning = f"{reasoning} {gpt_summary} {claude_summary} → {verdict}"
-
         answer_queue[user_id] = user_queue
-        print(f"[Final] User {user_id} → type={task_type}, answer={tg_answer}, verdict={verdict}, queued {len(user_queue)}", flush=True)
+        print(f"[Final] User {user_id} -> {tg_answer} (Verdict: {verdict})", flush=True)
 
-    if user_id not in user_data:
-        user_data[user_id] = {"history": []}
-
-    # Structured history entry
+    # Legacy formatting for TG
+    if user_id not in user_data: user_data[user_id] = {"history": []}
     filenames = [os.path.basename(f) for f in filepaths]
-
-    # Extract structured fields if we have a final answer
-    hist_task_type  = task_type  if 'task_type'  in dir() else "choice"
-    hist_matches    = sorted(final.get("matches", []), key=lambda x: x.get('d', 0)) if 'final' in dir() and hist_task_type == "drag" else []
-    hist_answer_val = final.get("answer", 0) if 'final' in dir() else 0
-    hist_subtype    = final.get("subtype", "n/a") if 'final' in dir() else "n/a"
-
+    
     user_data[user_id]["history"].append({
-        "timestamp":  get_now(),
-        "filenames":  filenames,
-        "task_type":  hist_task_type,
-        "subtype":    hist_subtype,
-        "answer":     tg_answer,
-        "answer_val": hist_answer_val,
-        "matches":    hist_matches,
-        "reasoning":  reasoning,
-        "confidence": confidence,
-        "verdict":    verdict if 'verdict' in dir() else "—",
-        "gpt_res":    gpt_r if 'gpt_r' in dir() else None,
-        "claude_res": claude_r if 'claude_r' in dir() else None
+        "timestamp": get_now(), "filenames": filenames,
+        "task_type": final.get("type", "choice") if final else "err",
+        "answer": tg_answer, "reasoning": reasoning,
+        "confidence": confidence, "verdict": verdict,
+        "twin": twin  # Save digital twin for dashboard visualization
     })
+    
+    # Small wrapper to call TG with minimal arguments for now or keep old signature
     send_to_telegram(
-        user_id, filepaths,
-        hist_task_type, hist_answer_val, hist_matches, hist_subtype,
+        user_id, filepaths, 
+        final.get("type", "choice") if final else "choice",
+        final.get("answer", 0) if final else 0,
+        final.get("matches", []) if final else [],
+        final.get("subtype", "n/a") if final else "n/a",
         reasoning, confidence,
-        gpt_res=gpt_r if 'gpt_r' in dir() else None,
-        claude_res=claude_r if 'claude_r' in dir() else None,
-        verdict=verdict if 'verdict' in dir() else "—"
+        gpt_res=gpt_r, claude_res=claude_r, verdict=verdict
     )
     save_data()
 

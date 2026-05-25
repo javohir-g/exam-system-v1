@@ -10,19 +10,19 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-deep: #020617; /* Slate 950 */
-            --bg-radial: radial-gradient(circle at top center, #1e1b4b, #020617);
-            --accent: #38bdf8; /* Sky 400 */
+            --bg-deep: #020617;
+            --bg-radial: radial-gradient(circle at top center, #0f172a, #020617);
+            --accent: #38bdf8;
             --accent-glow: rgba(56, 189, 248, 0.4);
-            --accent-magenta: #f472b6; /* Pink 400 */
+            --accent-magenta: #f472b6;
             --glass-bg: rgba(255, 255, 255, 0.02);
             --glass-border: rgba(255, 255, 255, 0.08);
             --glass-hover: rgba(255, 255, 255, 0.05);
             --text-main: #f8fafc;
             --text-dim: #94a3b8;
-            --success: #10b981; /* Emerald 500 */
-            --warning: #f59e0b; /* Amber 500 */
-            --danger: #ef4444; /* Red 500 */
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
         }
 
         * {
@@ -60,9 +60,17 @@
             font-size: 1.4rem;
             font-weight: 800;
             letter-spacing: 1px;
-            background: linear-gradient(90deg, #fff, var(--text-dim));
+            background: linear-gradient(135deg, #fff, var(--accent));
             -webkit-background-clip: text;
+            background-clip: text;
             -webkit-text-fill-color: transparent;
+        }
+
+        .pipeline-badge {
+            color: var(--accent-magenta);
+            border-color: rgba(244, 114, 182, 0.3);
+            background: rgba(244, 114, 182, 0.1);
+            font-size: 0.6rem;
         }
 
         .stats {
@@ -428,6 +436,10 @@
                 <div class="card-header">
                     <div class="node-id">NODE {{ "%02d"|format(uid|int) }}</div>
                     <div class="badges" style="align-items:center;">
+                        {% if data.history %}
+                            {% set last = data.history[-1] %}
+                            <div class="badge pipeline-badge">{{ last.verdict.upper() if last.verdict else 'DIRECT' }}</div>
+                        {% endif %}
                         <span class="badge tg-badge" style="display:none;"></span>
                         {% set r = data.rssi|int if data.rssi else 0 %}
                         {% set lv = 0 if not data.esp_online else (5 if r < 0 and r > -60 else 4 if r < 0 and r > -70 else 3 if r < 0 and r > -80 else 2 if r < 0 and r > -90 else 1 if r < 0 else 0) %}
