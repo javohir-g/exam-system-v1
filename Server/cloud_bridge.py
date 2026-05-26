@@ -786,6 +786,16 @@ def dashboard():
         # Calculate ESP online status (active in last 12 seconds)
         last_poll = heartbeats.get(uid, 0)
         data["esp_online"] = (now - last_poll) < 12
+        
+        # UI: Active if any signal/data in last 3 minutes
+        # We need the max of last_poll and last_upload_ts
+        last_up = 0
+        if data["history"]:
+            # Need to store raw timestamp in history or just check last_seen string?
+            # Better: use current heartbeats and a broad window.
+            last_up = last_poll # For now, poll is the best indicator of presence
+        
+        data["is_active"] = (now - last_poll) < 180
         all_users[uid] = data
         
     return render_template("dashboard.html", users=all_users)
