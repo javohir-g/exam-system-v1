@@ -619,6 +619,7 @@ def process_batch(user_id, filepaths, ts):
         "reasoning": reasoning,
         "confidence": confidence, 
         "verdict": verdict,
+        "is_negative": is_negative,
         "twin": twin,  # Save as dict for direct template access
         "gpt_res": gpt_r,
         "claude_res": claude_r
@@ -633,30 +634,34 @@ def process_batch(user_id, filepaths, ts):
     )
     save_data()
 
-@app.route("/reconnect", methods=["POST"])
+@app.route("/reconnect", methods=["GET", "POST"])
 def reconnect_node():
     """Queue a reconnect command for the specified node."""
-    data = request.json or {}
-    if API_SECRET_KEY and data.get("secret") != API_SECRET_KEY:
-        if request.headers.get("X-Secret") != API_SECRET_KEY:
-            return "Unauthorized", 401
-    user_id = str(data.get("user_id"))
-    reconnect_queue[user_id] = True
-    print(f"[*] Reconnect queued for Node {user_id}", flush=True)
+    user_id = request.args.get("user_id") or (request.json or {}).get("user_id")
+    if not user_id: return "Missing user_id", 400
+    
+    uid = str(user_id)
+    reconnect_queue[uid] = True
+    print(f"[*] Reconnect queued for Node {uid}", flush=True)
     return jsonify({"status": "queued"}), 200
 
-@app.route("/vibrate", methods=["POST"])
+@app.route("/vibrate", methods=["GET", "POST"])
 def vibrate():
     """Manually add a vibration command to the queue."""
-    if API_SECRET_KEY and request.headers.get("X-Secret") != API_SECRET_KEY:
-        # Check either header or JSON secret for flexibility from browser
-        data = request.json or {}
-        if data.get("secret") != API_SECRET_KEY:
-            return "Unauthorized", 401
-
-    data = request.json
-    user_id = str(data.get("user_id"))
-    count = int(data.get("count", 1))
+    user_id = request.args.get("user_id") or (request.json or {}).get("user_id")
+    count = request.args.get("count", 1) or (request.json or {}).get("count", 1)
+    
+    if not user_id: return "Missing user_id", 400
+    uid = str(user_id)
+    count = int(count)
+    
+    if uid not in answer_queue:
+        answer_queue[uid] = []
+    
+    cmd_id = int(time.time() * 1000)
+    answer_queue[uid].append({"count": count, "is_num": False, "cmd_id": cmd_id})
+    print(f"[*] Manual vibration {count} queued for Node {uid}", flush=True)
+    return jsonify({"status": "queued"}), 200
     
     if user_id not in answer_queue:
         answer_queue[user_id] = []

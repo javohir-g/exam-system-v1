@@ -533,18 +533,20 @@
 
             <div class="result-content">
                 <div class="result-header">
-                    <div class="type-tag">{{ entry.task_type }}</div>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <div class="type-tag">{{ entry.task_type }}</div>
+                        {% if entry.is_negative %}
+                            <div class="type-tag" style="background: rgba(239, 68, 68, 0.1); color: var(--danger); border-color: rgba(239, 68, 68, 0.3);">NEGATIVE</div>
+                        {% endif %}
+                    </div>
                     <div class="stat-val" style="color: var(--text-dim); font-size: 0.6rem;">VERDICT: {{ entry.verdict }}</div>
                 </div>
 
                 <div class="ans-main">
-                    {% if entry.task_type == 'choice' %}
-                        {% set letters = {1: "A", 2: "B", 3: "C", 4: "D", 5: "E", 6: "F"} %}
-                        {{ entry.answer_val }} ({{ letters.get(entry.answer_val|int, '?') }})
-                    {% elif entry.task_type == 'number' %}
-                        {{ entry.answer_val }}
+                    {% elif entry.task_type == 'drag' %}
+                        <span style="font-size: 1.2rem; vertical-align: middle; opacity: 0.8;">MATCHING:</span> {{ entry.matches|length }} PAIRS
                     {% else %}
-                        DATA_BLOCK
+                        {{ entry.answer_val if entry.answer_val else 'NO_DATA' }}
                     {% endif %}
                 </div>
 
@@ -582,7 +584,7 @@
                     </div>
                     <div class="meta-stat" style="margin-left: auto;">
                         <div class="stat-label">Confidence</div>
-                        <div class="stat-val" style="color: var(--accent);">{{ entry.confidence }}%</div>
+                        <div class="stat-val" style="color: var(--accent);">{{ (entry.confidence * 100)|int }}%</div>
                     </div>
                 </div>
             </div>
