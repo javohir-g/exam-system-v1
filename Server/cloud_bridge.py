@@ -747,6 +747,8 @@ def upload():
 
 @app.route("/")
 def index():
+    if not session.get("logged_in"):
+        return redirect(url_for("login"))
     return redirect(url_for("dashboard"))
 
 # --- AUTHENTICATION ---
