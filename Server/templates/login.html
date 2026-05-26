@@ -3,142 +3,169 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login | Exam Assistance System</title>
+    <title>Login | SCREEN FROG</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Outfit:wght@800&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-color: #050505;
-            --accent-color: #00f2fe;
-            --secondary-accent: #4face1;
-            --glass-bg: rgba(255, 255, 255, 0.03);
+            --bg-deep: #020617;
+            --bg-radial: radial-gradient(circle at top center, #0f172a, #020617);
+            --accent: #38bdf8;
+            --accent-glow: rgba(56, 189, 248, 0.4);
+            --glass-bg: rgba(255, 255, 255, 0.02);
             --glass-border: rgba(255, 255, 255, 0.08);
-            --text-main: #ffffff;
-            --text-dim: #a0a0a0;
+            --text-main: #f8fafc;
+            --text-dim: #64748b;
         }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', system-ui, sans-serif; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            background-color: var(--bg-color);
+            background: var(--bg-radial);
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            background-size: cover;
             color: var(--text-main);
+            font-family: 'Inter', sans-serif;
             height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
             overflow: hidden;
-            background-image: 
-                radial-gradient(circle at 20% 20%, rgba(79, 172, 225, 0.1) 0%, transparent 40%),
-                radial-gradient(circle at 80% 80%, rgba(0, 242, 254, 0.1) 0%, transparent 40%);
         }
 
         .login-card {
             background: var(--glass-bg);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
+            backdrop-filter: blur(24px);
             border: 1px solid var(--glass-border);
-            padding: 3rem;
+            padding: 48px;
             border-radius: 24px;
             width: 100%;
-            max-width: 400px;
+            max-width: 420px;
             text-align: center;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-            animation: fadeIn 0.8s ease-out;
+            box-shadow: 0 50px 100px -20px rgba(0, 0, 0, 0.6);
+            animation: cardAppear 0.8s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
+        @keyframes cardAppear {
+            from { opacity: 0; transform: translateY(30px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
         .logo {
-            font-size: 2rem;
+            font-family: 'Outfit', sans-serif;
+            font-size: 2.2rem;
             font-weight: 800;
-            margin-bottom: 0.5rem;
-            background: linear-gradient(135deg, var(--accent-color), var(--secondary-accent));
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #fff, var(--accent));
             -webkit-background-clip: text;
+            background-clip: text;
             -webkit-text-fill-color: transparent;
             letter-spacing: -1px;
         }
 
         .subtitle {
             color: var(--text-dim);
-            font-size: 0.875rem;
-            margin-bottom: 2.5rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 40px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
 
         .form-group {
-            margin-bottom: 1.5rem;
+            margin-bottom: 24px;
             text-align: left;
         }
 
         label {
             display: block;
             font-size: 0.75rem;
-            font-weight: 600;
+            font-weight: 700;
             color: var(--text-dim);
-            margin-bottom: 0.5rem;
+            margin-bottom: 8px;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 0.5px;
         }
 
         input {
             width: 100%;
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(0, 0, 0, 0.3);
             border: 1px solid var(--glass-border);
-            padding: 1rem;
+            padding: 14px 18px;
             border-radius: 12px;
-            color: white;
+            color: #fff;
             font-size: 1rem;
-            transition: all 0.3s;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             outline: none;
         }
 
         input:focus {
-            border-color: var(--accent-color);
-            background: rgba(255, 255, 255, 0.08);
-            box-shadow: 0 0 0 4px rgba(0, 242, 254, 0.1);
+            border-color: var(--accent);
+            background: rgba(0, 0, 0, 0.5);
+            box-shadow: 0 0 20px rgba(56, 189, 248, 0.15);
         }
 
         .btn {
             width: 100%;
-            background: linear-gradient(135deg, var(--accent-color), var(--secondary-accent));
-            color: #000;
+            background: var(--text-main);
+            color: var(--bg-deep);
             border: none;
-            padding: 1rem;
+            padding: 16px;
             border-radius: 12px;
-            font-size: 1rem;
-            font-weight: 700;
+            font-size: 0.95rem;
+            font-weight: 800;
             cursor: pointer;
             transition: all 0.3s;
-            margin-top: 1rem;
+            margin-top: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 20px -10px var(--accent-color);
-            filter: brightness(1.1);
+            background: var(--accent);
+            box-shadow: 0 10px 30px -10px var(--accent-glow);
         }
 
         .error {
-            background: rgba(255, 59, 48, 0.1);
-            color: #ff3b30;
-            padding: 0.75rem;
-            border-radius: 8px;
-            font-size: 0.875rem;
-            margin-bottom: 1.5rem;
-            border: 1px solid rgba(255, 59, 48, 0.2);
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+            padding: 12px;
+            border-radius: 10px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-bottom: 24px;
+            border: 1px solid rgba(239, 68, 68, 0.2);
         }
 
         .footer {
-            margin-top: 2rem;
-            font-size: 0.75rem;
-            color: rgba(255, 255, 255, 0.2);
+            margin-top: 32px;
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        }
+
+        /* Subtle background glow element */
+        .glow-orb {
+            position: absolute;
+            top: 20%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(56, 189, 248, 0.05) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: -1;
         }
     </style>
 </head>
 <body>
+    <div class="glow-orb"></div>
     <div class="login-card">
-        <div class="logo">EXAM V2</div>
-        <p class="subtitle">Enter your master key to access</p>
+        <div class="logo">SCREEN FROG</div>
+        <p class="subtitle">Secure Control Node</p>
         
         {% if error %}
         <div class="error">{{ error }}</div>
@@ -146,14 +173,14 @@
 
         <form action="/login" method="POST">
             <div class="form-group">
-                <label for="password">Master Password</label>
+                <label for="password">Identification Key</label>
                 <input type="password" id="password" name="password" placeholder="••••••••" required autofocus>
             </div>
-            <button type="submit" class="btn">Access Dashboard</button>
+            <button type="submit" class="btn">Authorize Access</button>
         </form>
 
         <div class="footer">
-            Secure Session Management Active
+            CRYPTO-SESSION ACTIVE
         </div>
     </div>
 </body>

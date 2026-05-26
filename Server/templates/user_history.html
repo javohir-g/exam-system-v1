@@ -3,16 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Node {{ uid }} | Transmission Log</title>
+    <title>Node {{ uid }} | SCREEN FROG</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@700;800&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg-deep: #020617;
-            --bg-radial: radial-gradient(circle at top center, #0f172a, #020617);
+            --bg-radial: radial-gradient(circle at top center, #0b1121, #020617);
             --accent: #38bdf8;
             --accent-glow: rgba(56, 189, 248, 0.4);
             --accent-magenta: #f472b6;
+            --avg-violet: #818cf8;
             --glass-bg: rgba(255, 255, 255, 0.02);
             --glass-border: rgba(255, 255, 255, 0.08);
             --glass-hover: rgba(255, 255, 255, 0.05);
@@ -22,6 +23,7 @@
             --warning: #f59e0b;
             --danger: #ef4444;
         }
+
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
@@ -34,786 +36,592 @@
             min-height: 100vh;
             display: flex;
             flex-direction: column;
+            overflow-x: hidden;
         }
 
-        /* ── HEADER ── */
+        /* ── STICKY HEADER ── */
         header {
-            background: rgba(2, 6, 23, 0.7);
-            backdrop-filter: blur(16px);
+            background: rgba(2, 6, 23, 0.85);
+            backdrop-filter: blur(20px);
             border-bottom: 1px solid var(--glass-border);
-            padding: 16px 20px;
+            padding: 16px 24px;
             position: sticky;
             top: 0;
-            z-index: 100;
-            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
         }
-        .header-row1 {
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .brand-box {
             display: flex;
             align-items: center;
-            gap: 12px;
-            margin-bottom: 12px;
+            gap: 16px;
         }
+
         .back-btn {
             color: var(--text-dim);
             text-decoration: none;
-            font-size: 0.8rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            padding: 6px 12px;
-            background: rgba(255,255,255,0.05);
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 8px 14px;
+            background: rgba(255,255,255,0.03);
             border: 1px solid var(--glass-border);
             border-radius: 8px;
-            white-space: nowrap;
-            transition: all 0.2s;
-        }
-        .back-btn:hover { 
-            color: var(--accent); 
-            border-color: var(--accent); 
-            background: rgba(56, 189, 248, 0.1); 
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        .node-title {
+        .back-btn:hover {
+            color: var(--accent);
+            border-color: var(--accent);
+            background: rgba(56, 189, 248, 0.1);
+            transform: translateX(-4px);
+        }
+
+        .node-id {
             font-family: 'Outfit', sans-serif;
-            font-size: 1.2rem;
+            font-size: 1.25rem;
             font-weight: 800;
+            text-transform: uppercase;
             letter-spacing: 1px;
-            background: linear-gradient(90deg, #fff, var(--text-dim));
+            background: linear-gradient(135deg, #fff, var(--accent));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
 
-        /* ── NODE INFO BAR ── */
-        .info-bar {
+        .logout-btn {
+            color: var(--danger);
+            text-decoration: none;
+            font-size: 0.7rem;
+            font-weight: 800;
+            padding: 6px 14px;
+            background: rgba(239, 68, 68, 0.05);
+            border: 1px solid rgba(239, 68, 68, 0.1);
+            border-radius: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: 0.2s;
+        }
+
+        .logout-btn:hover {
+            background: rgba(239, 68, 68, 0.15);
+            border-color: var(--danger);
+        }
+
+        /* ── COMMAND BAY ── */
+        .cmd-bay {
             display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
+            align-items: center;
+            gap: 24px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .status-group {
+            display: flex;
+            gap: 10px;
             align-items: center;
         }
 
-        .badge {
+        .pill {
             font-size: 0.65rem;
-            font-weight: 700;
-            padding: 4px 8px;
-            border-radius: 6px;
-            text-transform: uppercase;
-            background: rgba(0,0,0,0.4);
+            font-weight: 800;
+            padding: 4px 10px;
+            border-radius: 20px;
+            background: rgba(255,255,255,0.03);
             border: 1px solid var(--glass-border);
+            color: var(--text-dim);
             letter-spacing: 0.5px;
             display: flex;
             align-items: center;
-            gap: 4px;
+            gap: 6px;
         }
-        .badge-on   { color: var(--success); border-color: rgba(16,185,129,0.3); background: rgba(16,185,129,0.1); }
-        .badge-off  { color: var(--danger); border-color: rgba(239,68,68,0.3); background: rgba(239,68,68,0.1); }
-        .badge-idle { color: var(--text-dim); }
-        .badge-active { color: var(--success); border-color: rgba(16,185,129,0.3); background: rgba(16,185,129,0.1); }
-        .badge-ssid { color: var(--accent); border-color: rgba(56,189,248,0.3); background: rgba(56,189,248,0.1); }
 
-        /* Signal bars */
-        .signal-level {
-            display: flex;
-            align-items: flex-end;
-            gap: 2px;
-            height: 14px;
-            width: 25px;
-            padding: 2px 8px 2px 0;
-        }
-        .signal-bar { flex: 1; background: #334155; border-radius: 1px; min-height: 2px; transition: background 0.3s ease; }
-        .bar-1 { height: 20%; } .bar-2 { height: 40%; }
-        .bar-3 { height: 60%; } .bar-4 { height: 80%; }
-        .bar-5 { height: 100%; }
-        .sig-lv-5 .signal-bar { background: var(--success); box-shadow: 0 0 4px var(--success); }
-        .sig-lv-4 .signal-bar:nth-child(-n+4) { background: #84cc16; box-shadow: 0 0 4px #84cc16; }
-        .sig-lv-3 .signal-bar:nth-child(-n+3) { background: var(--warning); box-shadow: 0 0 4px var(--warning); }
-        .sig-lv-2 .signal-bar:nth-child(-n+2) { background: #f97316; box-shadow: 0 0 4px #f97316; }
-        .sig-lv-1 .signal-bar:nth-child(1)    { background: var(--danger); box-shadow: 0 0 4px var(--danger); }
-        .sig-lv-0 .signal-bar { background: #334155; }
+        .pill-on { color: var(--success); border-color: rgba(16, 185, 129, 0.3); background: rgba(16, 185, 129, 0.08); }
+        .pill-off { color: var(--danger); border-color: rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.08); }
 
-        /* ── ACTION BAR ── */
-        .action-bar {
+        .control-group {
+            margin-left: auto;
             display: flex;
             gap: 12px;
             align-items: center;
-            flex-wrap: wrap;
-            padding: 12px 20px;
-            background: rgba(0,0,0,0.3);
-            border-bottom: 1px solid var(--glass-border);
-            backdrop-filter: blur(8px);
         }
-        .action-label {
-            font-size: 0.75rem;
+
+        .control-label {
+            font-size: 0.65rem;
+            font-weight: 800;
             color: var(--text-dim);
-            font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 1px;
         }
-        .vibrate-count {
+
+        .v-input {
             width: 50px;
-            background: rgba(0,0,0,0.5);
+            background: rgba(0,0,0,0.4);
             border: 1px solid var(--glass-border);
-            color: var(--text-main);
-            border-radius: 8px;
+            color: #fff;
             padding: 6px;
-            font-size: 0.9rem;
-            font-family: 'Inter', sans-serif;
+            border-radius: 6px;
             text-align: center;
-            outline: none;
-            transition: border-color 0.2s;
-        }
-        .vibrate-count:focus { border-color: var(--accent); }
-
-        .btn {
-            background: rgba(255,255,255,0.05);
-            border: 1px solid var(--glass-border);
-            color: var(--text-dim);
-            border-radius: 8px;
-            padding: 8px 16px;
-            cursor: pointer;
-            font-size: 0.8rem;
             font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            font-family: 'Inter', sans-serif;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            outline: none;
+            transition: 0.2s;
         }
-        .btn:hover { border-color: rgba(255,255,255,0.2); color: var(--text-main); transform: translateY(-1px); }
-        .btn-vibrate:hover { border-color: var(--accent); color: var(--accent); background: rgba(56, 189, 248, 0.1); }
-        .btn-reconnect:hover { border-color: var(--warning); color: var(--warning); background: rgba(245, 158, 11, 0.1); }
-        .btn.ok { border-color: var(--success); color: var(--success); background: rgba(16, 185, 129, 0.1); }
 
-        /* ── CHAT ── */
-        .chat-feed {
+        .v-input:focus { border-color: var(--accent); box-shadow: 0 0 10px rgba(56, 189, 248, 0.2); }
+
+        .btn-op {
+            background: var(--text-main);
+            color: var(--bg-deep);
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 800;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: 0.2s;
+        }
+
+        .btn-op:hover { background: var(--accent); transform: translateY(-1px); box-shadow: 0 5px 15px var(--accent-glow); }
+
+        .btn-ghost {
+            background: transparent;
+            color: var(--text-dim);
+            border: 1px solid var(--glass-border);
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 800;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: 0.2s;
+        }
+
+        .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+        /* ── SIGNAL MONITOR (MINI) ── */
+        .sig-monitor {
+            display: flex;
+            align-items: flex-end;
+            gap: 2px;
+            height: 12px;
+            margin-left: 8px;
+        }
+        .s-bar { width: 3px; background: rgba(255,255,255,0.1); border-radius: 1px; }
+        .s-bar:nth-child(1) { height: 30%; }
+        .s-bar:nth-child(2) { height: 50%; }
+        .s-bar:nth-child(3) { height: 70%; }
+        .s-bar:nth-child(4) { height: 85%; }
+        .s-bar:nth-child(5) { height: 100%; }
+        
+        .sig-5 .s-bar { background: var(--success); }
+        .sig-4 .s-bar:nth-child(-n+4) { background: #84cc16; }
+        .sig-3 .s-bar:nth-child(-n+3) { background: var(--warning); }
+        .sig-2 .s-bar:nth-child(-n+2) { background: #f97316; }
+        .sig-1 .s-bar:nth-child(1) { background: var(--danger); }
+
+        /* ── CHAT FEED ── */
+        .chat-container {
             flex: 1;
-            padding: 24px;
+            max-width: 900px;
+            margin: 0 auto;
+            width: 100%;
+            padding: 40px 24px;
             display: flex;
             flex-direction: column;
-            gap: 32px;
-            max-width: 900px;
-            width: 100%;
-            margin: 0 auto;
+            gap: 48px;
         }
 
         .entry {
             display: flex;
             flex-direction: column;
-            gap: 12px;
-            animation: fadeIn 0.4s ease forwards;
+            gap: 16px;
+            animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Images block */
-        .imgs-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 8px;
-        }
-        .imgs-grid img {
-            width: 100%;
-            border-radius: 12px;
-            display: block;
-            cursor: zoom-in;
-            border: 1px solid var(--glass-border);
-            transition: transform 0.3s ease, border-color 0.3s ease;
-        }
-        .imgs-grid img:hover {
-            transform: scale(1.02);
-            border-color: rgba(255,255,255,0.2);
-            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-        }
-        .upload-wrap {
-            background: var(--glass-bg);
-            border: 1px solid var(--glass-border);
-            border-radius: 16px;
-            padding: 12px;
-            backdrop-filter: blur(12px);
-        }
-        .entry-meta {
-            font-size: 0.7rem;
-            color: var(--text-dim);
-            font-weight: 500;
-            padding: 0 4px;
+        .entry-header {
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 12px;
         }
-        .entry-meta::before { content: '🕑'; font-size: 0.8rem; }
 
-        /* ── ANSWER CARDS ── */
-        .ai-block {
+        .indicator-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--accent);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--accent);
+        }
+
+        .entry-time {
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--text-dim);
+            letter-spacing: 0.5px;
+        }
+
+        .transmission-card {
             background: var(--glass-bg);
-            border: 1px solid var(--glass-border);
-            border-radius: 16px;
-            padding: 20px;
             backdrop-filter: blur(12px);
-            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            overflow: hidden;
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+            transition: transform 0.3s, border-color 0.3s;
+        }
+
+        .transmission-card:hover { border-color: rgba(255,255,255,0.15); transform: translateY(-4px); }
+
+        .image-bay {
+            background: #000;
+            cursor: zoom-in;
             position: relative;
             overflow: hidden;
         }
-        .ai-block::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: linear-gradient(135deg, rgba(56, 189, 248, 0.04) 0%, transparent 100%);
-            pointer-events: none;
+
+        .image-bay img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0.7;
+            transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        /* type badge */
-        .type-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 0.65rem;
+        .image-bay:hover img { opacity: 1; transform: scale(1.05); }
+
+        .image-label {
+            position: absolute;
+            bottom: 12px;
+            left: 12px;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(4px);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.6rem;
             font-weight: 700;
+            color: #fff;
+            pointer-events: none;
+            opacity: 0.8;
+        }
+
+        .result-content {
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            position: relative;
+        }
+
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .type-tag {
+            font-size: 0.6rem;
+            font-weight: 800;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 1.5px;
             padding: 3px 10px;
             border-radius: 20px;
-            margin-bottom: 14px;
-            border: 1px solid;
+            background: rgba(129, 140, 248, 0.1);
+            color: var(--avg-violet);
+            border: 1px solid rgba(129, 140, 248, 0.2);
         }
-        .type-choice { color: #818cf8; border-color: rgba(129,140,248,.3); background: rgba(129,140,248,.1); }
-        .type-drag   { color: #f472b6; border-color: rgba(244,114,182,.3); background: rgba(244,114,182,.1); }
-        .type-number { color: #34d399; border-color: rgba(52,211,153,.3);  background: rgba(52,211,153,.1);  }
 
-        /* CHOICE card */
-        .choice-letter {
-            font-size: 3rem;
-            font-weight: 900;
+        .ans-main {
+            font-family: 'Outfit', sans-serif;
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--accent-magenta);
             line-height: 1;
-            color: #818cf8;
-            text-shadow: 0 0 20px rgba(129,140,248,0.4);
-            margin-bottom: 2px;
-        }
-        .choice-sub {
-            font-size: 0.75rem;
-            color: var(--text-dim);
-            margin-bottom: 14px;
+            text-shadow: 0 0 20px rgba(244, 114, 182, 0.25);
         }
 
-        /* NUMBER card */
-        .number-big {
-            font-size: 3rem;
-            font-weight: 900;
-            color: #34d399;
-            text-shadow: 0 0 20px rgba(52,211,153,0.4);
-            margin-bottom: 14px;
-        }
-
-        /* DRAG table */
-        .drag-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 14px;
-            font-size: 0.85rem;
-        }
-        .drag-table th {
-            text-align: left;
-            font-size: 0.6rem;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: var(--text-dim);
-            padding: 4px 10px;
-            border-bottom: 1px solid var(--glass-border);
-        }
-        .drag-table td {
-            padding: 7px 10px;
-            border-bottom: 1px solid rgba(255,255,255,0.04);
-        }
-        .drag-table tr:last-child td { border-bottom: none; }
-        .slot-idx {
-            font-weight: 700;
-            color: #f472b6;
-            width: 60px;
-        }
-        .item-idx {
-            background: rgba(244,114,182,0.12);
-            border: 1px solid rgba(244,114,182,0.25);
-            border-radius: 6px;
-            padding: 2px 10px;
-            font-weight: 700;
-            color: #f9a8d4;
-            display: inline-block;
-        }
-
-        /* reasoning + confidence footer */
-        /* Twin Recon Visualizer */
-        .twin-recon {
-            background: rgba(0, 0, 0, 0.25);
-            border: 1px solid var(--glass-border);
-            border-radius: 12px;
-            margin-bottom: 20px;
-            overflow: hidden;
-        }
-        .twin-header {
-            background: rgba(56, 189, 248, 0.1);
-            color: var(--accent);
-            padding: 8px 12px;
-            font-size: 0.65rem;
-            font-weight: 800;
-            letter-spacing: 1px;
-            border-bottom: 1px solid var(--glass-border);
-        }
-        .twin-content { padding: 15px; }
-        .twin-question {
-            font-size: 0.95rem;
-            font-weight: 600;
-            color: var(--text-main);
-            margin-bottom: 15px;
-            line-height: 1.4;
-        }
-        .twin-section { margin-bottom: 15px; }
-        .twin-section-title {
-            font-size: 0.7rem;
-            text-transform: uppercase;
-            color: var(--text-dim);
-            margin-bottom: 8px;
-            letter-spacing: 0.5px;
-        }
-        .twin-option-item {
-            display: flex;
-            align-items: flex-start;
-            gap: 10px;
-            padding: 6px 0;
+        .reasoning {
             font-size: 0.85rem;
             color: var(--text-dim);
-        }
-        .twin-checkbox { color: var(--accent); font-size: 0.8rem; margin-top: 2px; }
-        .twin-grid-split {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-        }
-        .twin-chips { display: flex; flex-wrap: wrap; gap: 8px; }
-        .twin-chip {
-            padding: 4px 10px;
-            border-radius: 6px;
-            font-size: 0.75rem;
-            font-weight: 500;
-            border: 1px solid rgba(255,255,255,0.1);
-        }
-        .chip-slot { background: rgba(244, 114, 182, 0.1); color: var(--accent-magenta); border-color: rgba(244, 114, 182, 0.2); }
-        .chip-item { background: rgba(56, 189, 248, 0.1); color: var(--accent); border-color: rgba(56, 189, 248, 0.2); }
-
-        .ai-footer {
-            border-top: 1px solid var(--glass-border);
-            padding-top: 12px;
-            margin-top: 4px;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-        .ai-reasoning {
-            font-size: 0.8rem;
-            color: var(--text-dim);
-            line-height: 1.5;
-        }
-        .confidence-row {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .conf-label {
-            font-size: 0.65rem;
-            font-weight: 700;
-            color: var(--text-dim);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            white-space: nowrap;
-        }
-        .conf-track {
-            flex: 1;
-            height: 4px;
-            background: rgba(255,255,255,0.05);
-            border-radius: 2px;
-            overflow: hidden;
-        }
-        .conf-fill {
-            height: 100%;
-            background: linear-gradient(90deg, var(--accent), #818cf8);
-            border-radius: 2px;
-            box-shadow: 0 0 8px var(--accent-glow);
-        }
-        .conf-pct {
-            font-size: 0.8rem;
-            font-weight: 700;
-            color: var(--accent);
-            min-width: 34px;
-            text-align: right;
-        }
-
-        /* Comparison block */
-        .comparison-block {
-            margin-top: 15px;
-            padding: 12px;
-            background: rgba(255,255,255,0.03);
-            border: 1px solid var(--glass-border);
-            border-radius: 12px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        .comp-item {
-            display: grid;
-            grid-template-columns: 80px 1fr;
-            gap: 8px;
-            align-items: baseline;
-        }
-        .comp-label {
-            font-size: 0.65rem;
-            font-weight: 800;
-            text-transform: uppercase;
-            color: var(--text-dim);
-            letter-spacing: 0.5px;
-        }
-        .comp-val {
-            font-size: 0.9rem;
-            font-weight: 700;
-            color: var(--accent);
-        }
-        .comp-reasoning {
-            grid-column: 2;
-            font-size: 0.75rem;
-            color: var(--text-dim);
-            opacity: 0.8;
-            line-height: 1.4;
+            line-height: 1.6;
             font-style: italic;
         }
-        .comp-verdict {
-            border-top: 1px solid var(--glass-border);
-            padding-top: 8px;
-            font-size: 0.75rem;
-            color: var(--text-main);
-            text-align: right;
+
+        .meta-strip {
+            margin-top: auto;
+            display: flex;
+            gap: 20px;
+            border-top: 1px solid rgba(255,255,255,0.05);
+            padding-top: 16px;
         }
 
-        /* Empty */
-        .empty {
-            text-align: center;
-            padding: 80px 0;
+        .meta-stat {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .stat-label {
+            font-size: 0.55rem;
+            font-weight: 800;
             color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-val {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        /* ── TWIN RECON COMPONENT ── */
+        .twin-recon {
+            margin-top: 12px;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 16px;
+        }
+
+        .recon-title {
+            font-size: 0.6rem;
+            font-weight: 800;
+            color: var(--accent);
+            text-transform: uppercase;
+            margin-bottom: 12px;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .recon-q {
             font-size: 0.9rem;
             font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 2px;
+            color: #fff;
+            margin-bottom: 12px;
         }
 
+        .recon-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
 
-        /* Lightbox */
-        #lb {
-            display: none;
+        .recon-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 10px;
+            background: rgba(255,255,255,0.02);
+            border-radius: 6px;
+            font-size: 0.75rem;
+        }
+
+        .recon-label { color: var(--text-dim); }
+        .recon-val { color: var(--accent-magenta); font-weight: 700; }
+
+        /* ── LIGHTBOX ── */
+        #lightbox {
             position: fixed;
             inset: 0;
-            background: rgba(2,6,23,0.95);
-            backdrop-filter: blur(10px);
+            background: rgba(2,6,23,0.98);
             z-index: 2000;
-            cursor: zoom-out;
+            display: none;
             align-items: center;
             justify-content: center;
-            padding: 20px;
+            cursor: zoom-out;
         }
-        #lb.open { display: flex; animation: fadeLb 0.2s ease; }
-        @keyframes fadeLb { from{opacity:0;} to{opacity:1;} }
-        #lb img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px; box-shadow: 0 20px 50px rgba(0,0,0,0.8); }
+        #lightbox img { max-width: 95%; max-height: 95%; object-fit: contain; border-radius: 8px; box-shadow: 0 0 100px rgba(0,0,0,0.8); }
 
-        /* Mobile */
-        @media (max-width: 600px) {
-            .node-title { font-size: 1rem; }
-            .action-bar { gap: 8px; justify-content: center; }
-            .chat-feed { padding: 16px; gap: 24px; }
-            .imgs-grid { grid-template-columns: 1fr; }
-            .ai-block { padding: 16px; }
-            .ai-answer { font-size: 1.2rem; }
-            .ai-reasoning, .confidence-row { margin-left: 0; }
+        .empty-state {
+            text-align: center;
+            padding: 100px 0;
+            color: var(--text-dim);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            opacity: 0.5;
+        }
+
+        @media (max-width: 768px) {
+            .transmission-card { grid-template-columns: 1fr; }
+            .image-bay { aspect-ratio: 16/9; }
+            .cmd-bay { flex-direction: column; align-items: stretch; gap: 16px; }
+            .control-group { margin-left: 0; justify-content: space-between; }
+            .header-top { gap: 12px; }
         }
     </style>
 </head>
 <body>
 
-<div id="lb" onclick="closeLb()"><img id="lb-img" src=""></div>
+<div id="lightbox" onclick="this.style.display='none'"><img id="lb-img" src=""></div>
 
-<!-- HEADER -->
 <header>
-    <div class="header-row1" style="justify-content: space-between; width: 100%;">
-        <div style="display: flex; align-items: center; gap: 12px;">
-            <a href="/dashboard" class="back-btn">← Back</a>
-            <span class="node-title">NODE {{ "%02d"|format(uid|int) }}</span>
+    <div class="header-top">
+        <div class="brand-box">
+            <a href="/dashboard" class="back-btn">← Home</a>
+            <div class="node-id">Node {{ "%02d"|format(uid|int) }}</div>
         </div>
-        <a href="/logout" style="text-decoration: none; background: rgba(239, 68, 68, 0.1); color: #ef4444; padding: 6px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; border: 1px solid rgba(239, 68, 68, 0.2); transition: 0.2s;" onmouseover="this.style.background='rgba(239, 68, 68, 0.2)'" onmouseout="this.style.background='rgba(239, 68, 68, 0.1)'">LOGOUT</a>
+        <a href="/logout" class="logout-btn">Log Output</a>
     </div>
 
     {% set node = users[uid] if users is defined and uid in users else {} %}
     {% set r = node.rssi|int if node.rssi else 0 %}
     {% set lv = 0 if not node.esp_online else (5 if r < 0 and r > -60 else 4 if r < 0 and r > -70 else 3 if r < 0 and r > -80 else 2 if r < 0 and r > -90 else 1 if r < 0 else 0) %}
 
-    <div class="info-bar">
-        <div class="signal-level sig-lv-{{ lv }}" title="{{ r if node.esp_online else '---' }} dBm">
-            <div class="signal-bar bar-1"></div>
-            <div class="signal-bar bar-2"></div>
-            <div class="signal-bar bar-3"></div>
-            <div class="signal-bar bar-4"></div>
-            <div class="signal-bar bar-5"></div>
+    <div class="cmd-bay">
+        <div class="status-group">
+            <div class="pill {{ 'pill-on' if node.esp_online else 'pill-off' }}">
+                {{ 'TRANSMITTING' if node.esp_online else 'OFFLINE' }}
+            </div>
+            {% if node.ssid %}
+            <div class="pill">📡 {{ node.ssid }}</div>
+            {% endif %}
+            <div class="sig-monitor sig-{{ lv }}" title="{{ r if node.esp_online else '---' }} dBm">
+                <div class="s-bar"></div>
+                <div class="s-bar"></div>
+                <div class="s-bar"></div>
+                <div class="s-bar"></div>
+                <div class="s-bar"></div>
+            </div>
         </div>
 
-        {% if node.ssid %}
-        <div class="badge badge-ssid">📡 {{ node.ssid }}</div>
-        {% endif %}
-
-        {% if node.esp_online %}
-        <div class="badge badge-on">● ESP ONLINE</div>
-        {% else %}
-        <div class="badge badge-off">● ESP OFFLINE</div>
-        {% endif %}
-
-        <div class="badge {{ 'badge-active' if history else 'badge-idle' }}">
-            {{ 'STREAMING' if history else 'IDLE' }}
+        <div class="control-group">
+            <span class="control-label">Impulse</span>
+            <input type="number" id="vcount" class="v-input" value="1" min="1" max="9">
+            <button class="btn-op" onclick="sendVibrate()">Activate</button>
+            <button class="btn-ghost" onclick="sendReconnect()">Rescan</button>
         </div>
-
-        {% if node.last_seen and node.last_seen != 'Never' %}
-        <div class="badge">{{ node.last_seen }}</div>
-        {% endif %}
     </div>
 </header>
 
-<!-- ACTION BAR -->
-<div class="action-bar">
-    <span class="action-label">Vibrate</span>
-    <input type="number" id="vcount" class="vibrate-count" value="1" min="1" max="9">
-    <button class="btn btn-vibrate" id="vbtn" onclick="sendVibrate()">VIBRATE</button>
-    <button class="btn btn-reconnect" id="rbtn" onclick="sendReconnect()">↺ RSCAN</button>
-</div>
+<div class="chat-container">
+    {% if not history %}
+    <div class="empty-state">No Data Packets Found</div>
+    {% endif %}
 
-<!-- CHAT FEED -->
-<div class="chat-feed" id="chat-box">
     {% for entry in history %}
-    {% if entry is mapping and entry.timestamp %}
     <div class="entry">
-        <!-- Images -->
-        <div class="upload-wrap">
-            <div class="imgs-grid">
-                {% if entry.filenames %}
-                    {% for fname in entry.filenames %}
-                    <img src="/screenshots/{{ fname }}" onclick="openLb(this.src)" loading="lazy">
-                    {% endfor %}
-                {% elif entry.filename %}
-                    <img src="/screenshots/{{ entry.filename }}" onclick="openLb(this.src)" loading="lazy">
-                {% endif %}
-            </div>
+        <div class="entry-header">
+            <div class="indicator-dot"></div>
+            <div class="entry-time">{{ entry.timestamp }}</div>
         </div>
-        <div class="entry-meta">📤 {{ entry.timestamp }}</div>
 
-        <!-- AI response -->
-        <div class="ai-block">
-          {% set tt = entry.task_type if entry.task_type is defined else 'choice' %}
-
-          {% if tt == 'choice' %}
-            {% set LETTERS = {1:'A',2:'B',3:'C',4:'D',5:'E',6:'F'} %}
-            {% set av = entry.answer_val if entry.answer_val is defined else 0 %}
-            <div class="type-badge type-choice">🎯 Multiple Choice</div>
-            <div class="choice-letter">{{ LETTERS[av] if av in LETTERS else '?' }}</div>
-            <div class="choice-sub">Option {{ av }}</div>
-
-          {% elif tt == 'number' %}
-            {% set av = entry.answer_val if entry.answer_val is defined else 0 %}
-            <div class="type-badge type-number">🔢 Numeric</div>
-            <div class="number-big">{{ av }}</div>
-
-          {% elif tt == 'drag' %}
-            {% set sub = entry.subtype if entry.subtype is defined else 'n/a' %}
-            {% set sub_label = {'matching':'🔗 Matching','ordering':'🔢 Ordering','fill_gap':'✏️ Fill Gap','category':'📂 Category'}.get(sub, '🖱 Drag & Drop') %}
-            <div class="type-badge type-drag">{{ sub_label }}</div>
-            <table class="drag-table">
-              <thead><tr><th>Slot</th><th>← Item</th></tr></thead>
-              <tbody>
-                {% for m in (entry.matches if entry.matches is defined else []) %}
-                <tr>
-                  <td class="slot-idx">#{{ m.d }}</td>
-                  <td><span class="item-idx">{{ m.s }}</span></td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-
-          {% else %}
-            <div class="type-badge type-choice">❓ Unknown</div>
-            <div style="font-size:1.2rem;font-weight:700;color:var(--accent-magenta);margin-bottom:12px;">
-              → {{ entry.answer if entry.answer else '—' }}
+        <div class="transmission-card">
+            <div class="image-bay" onclick="showLightbox('/screenshots/{{ entry.filenames[0] }}')">
+                <img src="/screenshots/{{ entry.filenames[0] }}" alt="Packet Frame">
+                <div class="image-label">RAW_FRAME_{{ loop.revindex }}</div>
             </div>
-          {% endif %}
 
-          <!-- footer: reasoning + confidence -->
-          <div class="ai-footer">
-            {% if entry.reasoning %}
-            <div class="ai-reasoning">🧠 {{ entry.reasoning }}</div>
-            {% endif %}
+            <div class="result-content">
+                <div class="result-header">
+                    <div class="type-tag">{{ entry.task_type }}</div>
+                    <div class="stat-val" style="color: var(--text-dim); font-size: 0.6rem;">VERDICT: {{ entry.verdict }}</div>
+                </div>
 
-            <!-- Comparison Block -->
-            <!-- Digital Twin Reconstruction (Blueprint) -->
-            {% if entry.twin and entry.twin is mapping %}
-            <div class="twin-recon">
-              <div class="twin-header">🏗️ PAGE RECONSTRUCTION (DIGITAL TWIN)</div>
-              <div class="twin-content">
-                <div class="twin-question">{{ entry.twin.get('questionText', 'N/A') }}</div>
-                
-                {% if entry.twin.get('options') %}
-                <div class="twin-section">
-                  <div class="twin-section-title">Options</div>
-                  <div class="twin-options">
-                    {% for opt in entry.twin['options'] %}
-                    <div class="twin-option-item">
-                      <span class="twin-checkbox">🔲</span>
-                      <span class="twin-opt-text">{{ opt.text }}</span>
+                <div class="ans-main">
+                    {% if entry.task_type == 'choice' %}
+                        {% set letters = {1: "A", 2: "B", 3: "C", 4: "D", 5: "E", 6: "F"} %}
+                        {{ entry.answer_val }} ({{ letters.get(entry.answer_val|int, '?') }})
+                    {% elif entry.task_type == 'number' %}
+                        {{ entry.answer_val }}
+                    {% else %}
+                        DATA_BLOCK
+                    {% endif %}
+                </div>
+
+                {% if entry.reasoning %}
+                <div class="reasoning">"{{ entry.reasoning }}"</div>
+                {% endif %}
+
+                {% if entry.twin %}
+                <div class="twin-recon">
+                    <div class="recon-title">
+                        <span>🧬 Semantic Reconstruction</span>
                     </div>
-                    {% endfor %}
-                  </div>
+                    {% if entry.twin.question %}
+                    <div class="recon-q">{{ entry.twin.question }}</div>
+                    {% endif %}
+                    <div class="recon-grid">
+                        {% for m in entry.matches %}
+                        <div class="recon-item">
+                            <span class="recon-label">Option {{ m.d }}</span>
+                            <span class="recon-val">Item {{ m.s }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
                 </div>
                 {% endif %}
 
-                {% if entry.twin.get('slots') or entry.twin.get('items') %}
-                <div class="twin-grid-split">
-                  {% if entry.twin.get('slots') %}
-                  <div class="twin-section">
-                    <div class="twin-section-title">Drop Slots</div>
-                    <div class="twin-chips">
-                      {% for slot in entry.twin['slots'] %}
-                      <span class="twin-chip chip-slot">{{ slot.label or 'Slot ' ~ loop.index }}</span>
-                      {% endfor %}
+                <div class="meta-strip">
+                    <div class="meta-stat">
+                        <div class="stat-label">Model A</div>
+                        <div class="stat-val">{{ entry.gpt_res.answer if entry.gpt_res else '---' }}</div>
                     </div>
-                  </div>
-                  {% endif %}
-                  
-                  {% if entry.twin.get('items') %}
-                  <div class="twin-section">
-                    <div class="twin-section-title">Draggable Items</div>
-                    <div class="twin-chips">
-                      {% for item in entry.twin['items'] %}
-                      <span class="twin-chip chip-item">{{ item.text }}</span>
-                      {% endfor %}
+                    <div class="meta-stat">
+                        <div class="stat-label">Model B</div>
+                        <div class="stat-val">{{ entry.claude_res.answer if entry.claude_res else '---' }}</div>
                     </div>
-                  </div>
-                  {% endif %}
-                </div>
-                {% endif %}
-              </div>
-            </div>
-            {% endif %}
-                <div class="comp-item">
-                    <span class="comp-label">GPT-4o</span>
-                    <span class="comp-val">
-                        {% if entry.gpt_res and entry.gpt_res is mapping %}
-                            {% if entry.gpt_res.answer is defined and entry.gpt_res.answer != 'TWIN' %}
-                                {{ entry.gpt_res.answer }}
-                            {% elif entry.gpt_res.matches %}
-                                [{% for m in entry.gpt_res.matches[:2] %}{{m.s}}→{{m.d}}{% if not loop.last %},{% endif %}{% endfor %}{% if entry.gpt_res.matches|length > 2 %}...{% endif %}]
-                            {% else %}
-                                {{ entry.gpt_res.answer if entry.gpt_res.answer else '✗' }}
-                            {% endif %}
-                        {% else %}
-                            ✗
-                        {% endif %}
-                    </span>
-                    {% if entry.gpt_res and entry.gpt_res is mapping and entry.gpt_res.reasoning %}
-                    <div class="comp-reasoning">{{ entry.gpt_res.reasoning }}</div>
-                    {% endif %}
-                </div>
-                <div class="comp-item">
-                    <span class="comp-label">Claude 3.5</span>
-                    <span class="comp-val">
-                        {% if entry.claude_res and entry.claude_res is mapping %}
-                            {% if entry.claude_res.answer is defined %}
-                                {{ entry.claude_res.answer }}
-                            {% elif entry.claude_res.matches %}
-                                [{% for m in entry.claude_res.matches[:2] %}{{m.s}}→{{m.d}}{% if not loop.last %},{% endif %}{% endfor %}{% if entry.claude_res.matches|length > 2 %}...{% endif %}]
-                            {% else %}
-                                ✗
-                            {% endif %}
-                        {% else %}
-                            ✗
-                        {% endif %}
-                    </span>
-                    {% if entry.claude_res and entry.claude_res is mapping and entry.claude_res.reasoning %}
-                    <div class="comp-reasoning">{{ entry.claude_res.reasoning }}</div>
-                    {% endif %}
-                </div>
-                <div class="comp-verdict">
-                    ⚖️ Verdict: <strong>{{ entry.verdict if entry.verdict else '—' }}</strong>
+                    <div class="meta-stat" style="margin-left: auto;">
+                        <div class="stat-label">Confidence</div>
+                        <div class="stat-val" style="color: var(--accent);">{{ entry.confidence }}%</div>
+                    </div>
                 </div>
             </div>
-
-            {% if entry.confidence is defined %}
-            <div class="confidence-row">
-              <span class="conf-label">Confidence</span>
-              <div class="conf-track"><div class="conf-fill" style="width:{{ (entry.confidence * 100)|round|int }}%"></div></div>
-              <span class="conf-pct">{{ (entry.confidence * 100)|round|int }}%</span>
-            </div>
-            {% endif %}
-          </div>
         </div>
     </div>
-    {% endif %}
     {% endfor %}
-
-    {% if not history %}
-    <div class="empty">Waiting for data packets…</div>
-    {% endif %}
 </div>
 
 <script>
-    const UID = "{{ uid }}";
-    const SECRET = "super-secret-key";
-
-    function openLb(src) {
+    function showLightbox(src) {
         document.getElementById('lb-img').src = src;
-        document.getElementById('lb').classList.add('open');
-    }
-    function closeLb() { document.getElementById('lb').classList.remove('open'); }
-
-    function flashBtn(id, msg, cls) {
-        const b = document.getElementById(id);
-        const orig = b.textContent;
-        b.textContent = msg;
-        b.classList.add(cls || 'ok');
-        setTimeout(() => { b.textContent = orig; b.classList.remove(cls || 'ok'); }, 1500);
+        document.getElementById('lightbox').style.display = 'flex';
     }
 
-    function sendVibrate() {
+    async function sendVibrate() {
         const count = document.getElementById('vcount').value;
-        fetch('/vibrate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user_id: UID, count: parseInt(count), secret: SECRET })
-        }).then(r => flashBtn('vbtn', r.ok ? 'SENT ✓' : 'ERR ✗'));
+        const btn = event.target;
+        btn.textContent = '...';
+        try {
+            await fetch(`/vibrate?user_id={{ uid }}&count=${count}`);
+            btn.textContent = 'Sent';
+            setTimeout(() => btn.textContent = 'Activate', 1000);
+        } catch(e) {
+            btn.textContent = 'Error';
+        }
     }
 
-    function sendReconnect() {
-        fetch('/reconnect', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user_id: UID, secret: SECRET })
-        }).then(r => flashBtn('rbtn', r.ok ? 'QUEUED ✓' : 'ERR ✗'));
+    async function sendReconnect() {
+        const btn = event.target;
+        btn.textContent = '...';
+        try {
+            await fetch(`/reconnect?user_id={{ uid }}`);
+            btn.textContent = 'Queued';
+            setTimeout(() => btn.textContent = 'Rescan', 1000);
+        } catch(e) {
+            btn.textContent = 'Error';
+        }
     }
-
-    // Live update every 3s
-    let countBefore = {{ history|length }};
-    setInterval(() => {
-        fetch(window.location.href).then(r => r.text()).then(html => {
-            const doc = new DOMParser().parseFromString(html, 'text/html');
-            const newBox = doc.getElementById('chat-box');
-            const newCount = doc.querySelectorAll('.entry').length;
-            if (newCount > countBefore) {
-                document.getElementById('chat-box').innerHTML = newBox.innerHTML;
-                countBefore = newCount;
-                window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-            }
-        });
-    }, 3000);
 </script>
+
 </body>
 </html>

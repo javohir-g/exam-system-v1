@@ -581,6 +581,20 @@ def process_batch(user_id, filepaths, ts):
         answer_queue[user_id] = user_queue
         print(f"[Final] User {user_id} -> {tg_answer} (Verdict: {verdict})", flush=True)
 
+    # ── Step 5: Negative Feedback Logic ──────────────────────────────────────
+    # If answer is 0, Error, or reasoning contains "insufficient data/error"
+    # we send 1 brief vibration to the device.
+    negative_keywords = ["недостаточно данных", "ошибка", "пустое окно", "не могу", "непонятно", "error"]
+    is_negative = False
+    
+    if not final or answer_val == 0 or any(k in reasoning.lower() for k in negative_keywords):
+        is_negative = True
+        
+    if is_negative:
+        print(f"[*] Negative result detected for User {user_id}. Queuing 1-pulse feedback.", flush=True)
+        # Clear queue and add 1 pulse
+        answer_queue[user_id] = [{"count": 1, "count2": 0, "cmd_id": ts, "is_negative": True}]
+
     # Save to history for Dashboard
     if user_id not in user_data: user_data[user_id] = {"history": []}
     filenames = [os.path.basename(f) for f in filepaths]
