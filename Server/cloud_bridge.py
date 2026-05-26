@@ -731,6 +731,10 @@ def upload():
 
 # --- DASHBOARD ROUTES ---
 
+@app.route("/")
+def index():
+    return redirect(url_for("dashboard"))
+
 # --- AUTHENTICATION ---
 def login_required(f):
     @functools.wraps(f)
