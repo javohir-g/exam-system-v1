@@ -2,6 +2,8 @@
 #include <ArduinoJson.h>
 #include <WiFiClientSecure.h>
 #include <WiFi.h>
+#include <esp_sleep.h>     // Light Sleep support
+#include <esp_wifi.h>       // WiFi power management
 
 // --- KNOWN NETWORKS ---
 struct KnownAP {
@@ -90,6 +92,12 @@ void setup() {
 
   WiFi.mode(WIFI_STA);
   connectToBestNetwork();
+
+  // ── Light Sleep: WiFi modem sleeps between polls ──
+  WiFi.setSleep(WIFI_PS_MIN_MODEM); // Modem Sleep: saves power, keeps connection
+  esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
+
+  Serial.println("[*] Light Sleep mode enabled. Battery saver ON.");
 }
 
 void vibrate(int times) {
@@ -224,6 +232,10 @@ void loop() {
     delete client;
   }
   
-  delay(3000);
+  // ── Light Sleep for 3 seconds instead of busy delay ──
+  // WiFi stays connected, RAM is kept, variables survive wakeup
+  esp_sleep_enable_timer_wakeup(3000000ULL); // 3 seconds in microseconds
+  esp_light_sleep_start();
+  // <<< CPU resumes here after wakeup, loop() continues >>>
 }
 
