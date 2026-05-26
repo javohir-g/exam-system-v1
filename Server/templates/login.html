@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login | SCREEN FROG</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Outfit:wght@800&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg-deep: #020617;
@@ -13,12 +14,16 @@
             --accent: #38bdf8;
             --accent-glow: rgba(56, 189, 248, 0.4);
             --glass-bg: rgba(255, 255, 255, 0.02);
-            --glass-border: rgba(255, 255, 255, 0.08);
+            --glass-border: rgba(255, 255, 255, 0.06);
+            --glass-hover: rgba(255, 255, 255, 0.04);
             --text-main: #f8fafc;
             --text-dim: #64748b;
+            --success: #10b981;
+            --danger: #ef4444;
+            --card-radius: 16px;
         }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
             background: var(--bg-radial);
@@ -26,162 +31,181 @@
             background-attachment: fixed;
             background-size: cover;
             color: var(--text-main);
-            font-family: 'Inter', sans-serif;
-            height: 100vh;
+            font-family: 'Inter', -apple-system, sans-serif;
+            min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
             overflow: hidden;
         }
 
+        /* ── LOGIN CARD ── */
         .login-card {
             background: var(--glass-bg);
-            backdrop-filter: blur(24px);
+            backdrop-filter: blur(20px);
             border: 1px solid var(--glass-border);
+            border-radius: var(--card-radius);
             padding: 48px;
-            border-radius: 24px;
             width: 100%;
-            max-width: 420px;
-            text-align: center;
-            box-shadow: 0 50px 100px -20px rgba(0, 0, 0, 0.6);
-            animation: cardAppear 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+            max-width: 400px;
+            box-shadow: 0 40px 80px rgba(0, 0, 0, 0.5);
+            animation: card-appear 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
         }
 
-        @keyframes cardAppear {
-            from { opacity: 0; transform: translateY(30px); }
+        @keyframes card-appear {
+            from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
-        .logo {
+        .logo-box {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .logo-box h1 {
             font-family: 'Outfit', sans-serif;
-            font-size: 2.2rem;
+            font-size: 2.25rem;
             font-weight: 800;
-            margin-bottom: 8px;
+            letter-spacing: -0.5px;
             background: linear-gradient(135deg, #fff, var(--accent));
             -webkit-background-clip: text;
             background-clip: text;
             -webkit-text-fill-color: transparent;
-            letter-spacing: -1px;
-        }
-
-        .subtitle {
-            color: var(--text-dim);
-            font-size: 0.85rem;
-            font-weight: 600;
-            margin-bottom: 40px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .form-group {
-            margin-bottom: 24px;
-            text-align: left;
-        }
-
-        label {
-            display: block;
-            font-size: 0.75rem;
-            font-weight: 700;
-            color: var(--text-dim);
             margin-bottom: 8px;
+        }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            font-size: 0.65rem;
+            font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.5px;
+        }
+
+        /* ── FORM ── */
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        .input-wrapper {
+            position: relative;
         }
 
         input {
             width: 100%;
             background: rgba(0, 0, 0, 0.3);
             border: 1px solid var(--glass-border);
-            padding: 14px 18px;
-            border-radius: 12px;
+            border-radius: 8px;
+            padding: 14px 16px;
             color: #fff;
-            font-size: 1rem;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-family: inherit;
+            font-size: 0.95rem;
             outline: none;
+            transition: all 0.2s;
         }
 
         input:focus {
             border-color: var(--accent);
             background: rgba(0, 0, 0, 0.5);
-            box-shadow: 0 0 20px rgba(56, 189, 248, 0.15);
+            box-shadow: 0 0 12px rgba(56, 189, 248, 0.15);
         }
 
-        .btn {
+        .btn-submit {
             width: 100%;
-            background: var(--text-main);
-            color: var(--bg-deep);
+            padding: 14px;
+            border-radius: 8px;
             border: none;
-            padding: 16px;
-            border-radius: 12px;
-            font-size: 0.95rem;
+            background: #fff;
+            color: var(--bg-deep);
             font-weight: 800;
-            cursor: pointer;
-            transition: all 0.3s;
-            margin-top: 8px;
+            font-size: 0.9rem;
             text-transform: uppercase;
             letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 8px;
         }
 
-        .btn:hover {
-            transform: translateY(-2px);
+        .btn-submit:hover {
             background: var(--accent);
-            box-shadow: 0 10px 30px -10px var(--accent-glow);
+            transform: translateY(-1px);
+            box-shadow: 0 8px 16px var(--accent-glow);
         }
 
-        .error {
-            background: rgba(239, 68, 68, 0.1);
-            color: #ef4444;
+        .error-msg {
+            margin-top: 20px;
             padding: 12px;
-            border-radius: 10px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            margin-bottom: 24px;
+            background: rgba(239, 68, 68, 0.1);
             border: 1px solid rgba(239, 68, 68, 0.2);
+            border-radius: 8px;
+            color: var(--danger);
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-align: center;
         }
 
-        .footer {
-            margin-top: 32px;
-            font-size: 0.7rem;
-            color: var(--text-dim);
-            font-weight: 500;
-            letter-spacing: 0.5px;
-        }
-
-        /* Subtle background glow element */
-        .glow-orb {
+        /* ── DECORATION ── */
+        .corner-accent {
             position: absolute;
-            top: 20%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 600px;
-            height: 600px;
-            background: radial-gradient(circle, rgba(56, 189, 248, 0.05) 0%, transparent 70%);
-            pointer-events: none;
-            z-index: -1;
+            top: 20px;
+            right: 20px;
+            width: 6px;
+            height: 6px;
+            background: var(--accent);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--accent);
+        }
+
+        @media (max-width: 480px) {
+            .login-card { padding: 32px 24px; max-width: 90%; }
         }
     </style>
 </head>
 <body>
-    <div class="glow-orb"></div>
-    <div class="login-card">
-        <div class="logo">SCREEN FROG</div>
-        <p class="subtitle">Secure Control Node</p>
-        
-        {% if error %}
-        <div class="error">{{ error }}</div>
-        {% endif %}
 
-        <form action="/login" method="POST">
+    <div class="login-card">
+        <div class="corner-accent"></div>
+        
+        <div class="logo-box">
+            <h1>SCREEN FROG</h1>
+            <div class="status-pill">● Authentication Required</div>
+        </div>
+
+        <form method="POST">
             <div class="form-group">
-                <label for="password">Identification Key</label>
-                <input type="password" id="password" name="password" placeholder="••••••••" required autofocus>
+                <label for="password">Encrypted Access</label>
+                <div class="input-wrapper">
+                    <input type="password" name="password" id="password" placeholder="••••••••••••" required autofocus>
+                </div>
             </div>
-            <button type="submit" class="btn">Authorize Access</button>
+
+            <button type="submit" class="btn-submit">Enter Pipeline</button>
         </form>
 
-        <div class="footer">
-            CRYPTO-SESSION ACTIVE
+        {% if error %}
+        <div class="error-msg">
+            ACCESS_DENIED: Invalid Credentials
         </div>
+        {% endif %}
     </div>
+
 </body>
 </html>
