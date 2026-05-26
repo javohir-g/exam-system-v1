@@ -252,13 +252,22 @@ def poll():
         count = data.get("count", 0)
         count2 = data.get("count2", 0)
         cmd_id = data.get("cmd_id", 0)
+        is_num = data.get("is_num", False)
+        is_neg = data.get("is_negative", False)
         
         answer_queue[user_id] = queue
         save_data()
-        print(f"[*] Polled User {user_id}: {count}/{count2} (Remaining: {len(queue)})", flush=True)
-        return jsonify({"count": count, "count2": count2, "cmd_id": cmd_id}), 200
+        print(f"[*] Polled User {user_id}: {count}/{count2} (Num: {is_num}, Neg: {is_neg})", flush=True)
+        return jsonify({
+            "count": count, 
+            "answer": count,  # Synonym for old firmware
+            "count2": count2, 
+            "cmd_id": cmd_id,
+            "is_num": is_num,
+            "is_negative": is_neg
+        }), 200
     
-    return jsonify({"count": 0, "count2": 0, "cmd_id": 0}), 200
+    return jsonify({"count": 0, "answer": 0, "count2": 0, "cmd_id": 0, "is_num": False, "is_negative": False}), 200
 
 @app.route("/esp_report", methods=["POST"])
 def esp_report():

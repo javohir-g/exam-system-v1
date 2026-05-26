@@ -161,81 +161,76 @@ void sendDebugReport(int count, long cmdId, String action) {
 }
 
 void loop() {
-  // Auto-reconnect if WiFi dropped
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("[WiFi] Disconnected. Reconnecting...");
     WiFi.disconnect();
     connectToBestNetwork();
   }
 
-  WiFiClientSecure *client = new WiFiClientSecure;
-  if(client) {
-    client->setInsecure();
-    HTTPClient http;
-    String ssid = WiFi.SSID();
-    ssid.replace(" ", "%20"); // URL-encode spaces
-    String url = String(pollUrl) + "?user_id=" + String(USER_ID)
-               + "&rssi=" + String(WiFi.RSSI())
-               + "&ssid=" + ssid;
-    http.begin(*client, url);
-    http.addHeader("X-Secret", secretKey);
-    http.setTimeout(5000);
+  // Use http instead of https for better memory/stability
+  HTTPClient http;
+  String ssid = WiFi.SSID();
+  ssid.replace(" ", "%20");
+  String url = String(pollUrl) + "?user_id=" + String(USER_ID)
+             + "&rssi=" + String(WiFi.RSSI())
+             + "&ssid=" + ssid;
+  
+  http.begin(url); // Use non-secure client by default for C3
+  http.addHeader("X-Secret", secretKey);
+  http.setTimeout(5000);
 
-    int httpCode = http.GET();
-    if (httpCode == 200) {
-      String payload = http.getString();
-      StaticJsonDocument<256> doc;
-      DeserializationError error = deserializeJson(doc, payload);
+  int httpCode = http.GET();
+  if (httpCode == 200) {
+    String payload = http.getString();
+    StaticJsonDocument<256> doc;
+    DeserializationError error = deserializeJson(doc, payload);
 
-      if (!error) {
-        // Check for reconnect command
-        if (doc["reconnect"] == true) {
-          Serial.println("[CMD] Reconnect command received. Scanning best network...");
-          http.end();
-          delete client;
-          WiFi.disconnect();
-          delay(500);
-          connectToBestNetwork();
-          return;
-        }
+    if (!error) {
+      if (doc["reconnect"] == true) {
+        Serial.println("[CMD] Reconnect command received...");
+        http.end();
+        WiFi.disconnect();
+        delay(500);
+        connectToBestNetwork();
+        return;
+      }
 
-        int count = doc["count"];
-        int count2 = doc["count2"] | 0;
-        bool isNum = doc["is_num"] | false;
-        long cmdId = doc["cmd_id"];
+      int count = doc["count"];
+      int count2 = doc["count2"] | 0;
+      bool isNum = doc["is_num"] | false;
+      bool isNeg = doc["is_negative"] | false;
+      long cmdId = doc["cmd_id"];
 
-        if ((count > 0 || isNum) && cmdId != lastCommandId) {
-          lastCommandId = cmdId;
-          sendDebugReport(count, cmdId, "vibrating");
-          
-          if (isNum) {
-            String s = String(count);
-            for(int i = 0; i < s.length(); i++) {
-              int d = s.charAt(i) - '0';
-              if (d == 0) vibrateZero();
-              else vibrate(d);
-              if (i < s.length() - 1) delay(2000); // 2 sec pause between digits
-            }
-          } else if (count2 > 0) {
-            vibrateDrag(count, count2);
-          } else {
-            vibrate(count);
+      if (((count > 0 || isNum || isNeg) && cmdId != lastCommandId) || (isNeg && cmdId != lastCommandId)) {
+        lastCommandId = cmdId;
+        sendDebugReport(count, cmdId, "vibrating");
+        
+        if (isNeg) {
+          Serial.println("[HAPTIC] Negative result detected. 1 short pulse.");
+          vibrate(1);
+        } else if (isNum) {
+          String s = String(count);
+          for(int i = 0; i < s.length(); i++) {
+            int d = s.charAt(i) - '0';
+            if (d == 0) vibrateZero();
+            else vibrate(d);
+            if (i < s.length() - 1) delay(2000);
           }
-          sendDebugReport(0, cmdId, "idle");
-          delay(5000);
+        } else if (count2 > 0) {
+          vibrateDrag(count, count2);
         } else {
-          sendDebugReport(0, lastCommandId, "idle");
+          vibrate(count);
         }
+        sendDebugReport(0, cmdId, "idle");
+        delay(3000);
       }
     }
-    http.end();
-    delete client;
   }
+  http.end();
   
   // ── Light Sleep for 3 seconds instead of busy delay ──
   // WiFi stays connected, RAM is kept, variables survive wakeup
   esp_sleep_enable_timer_wakeup(3000000ULL); // 3 seconds in microseconds
   esp_light_sleep_start();
-  // <<< CPU resumes here after wakeup, loop() continues >>>
 }
 
