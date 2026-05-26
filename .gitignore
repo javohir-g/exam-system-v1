@@ -7,5 +7,6 @@ Server/database.json
 # Build files
 *.exe
 *.bin
+*.obj
 build/
 .arduino/
