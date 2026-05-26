@@ -1,0 +1,15 @@
+# Environment secrets
+.env
+Server/.env
+Server/screenshots/
+Server/database.json
+
+# Agent (Stealth)
+Agent/
+
+# Build files
+*.exe
+*.bin
+*.obj
+build/
+.arduino/
