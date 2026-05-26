@@ -6,18 +6,22 @@ import traceback
 import json
 import base64
 import re
-import concurrent.futures
 from datetime import datetime
-from flask import Flask, request, jsonify, render_template, send_from_directory
+from concurrent.futures import ThreadPoolExecutor
+import functools
+from flask import Flask, request, jsonify, render_template, send_from_directory, session, redirect, url_for
+from werkzeug.security import check_password_hash, generate_password_hash
 from dotenv import load_dotenv
 
 # Load local .env variables
 load_dotenv()
 
 app = Flask(__name__)
+# Keep session secret separate from API secret
+app.secret_key = os.getenv("SECRET_KEY", "industrial-grade-secret-key-1337-v2")
 
 # --- SETTINGS ---
-SECRET_KEY = "super-secret-key"
+API_SECRET_KEY = os.getenv("API_SECRET", "super-secret-key")
 SCREENSHOT_DIR = "screenshots"
 
 if not os.path.exists(SCREENSHOT_DIR):
@@ -208,9 +212,9 @@ def ping():
 @app.route("/poll", methods=["GET"])
 def poll():
     """ESP32 calls this to get pending answers. Pops the first command from the user's queue."""
-    if request.headers.get("X-Secret") != SECRET_KEY:
+    if request.headers.get("X-Secret") != API_SECRET_KEY:
         # Check query param if header is missing for easier testing
-        if request.args.get("secret") != SECRET_KEY:
+        if request.args.get("secret") != API_SECRET_KEY:
             return "Unauthorized", 401
     
     user_id = request.args.get("user_id")
@@ -259,7 +263,7 @@ def poll():
 @app.route("/esp_report", methods=["POST"])
 def esp_report():
     """Receives debug info from ESP32."""
-    if request.headers.get("X-Secret") != SECRET_KEY:
+    if request.headers.get("X-Secret") != API_SECRET_KEY:
         return "Unauthorized", 401
     
     data = request.json
@@ -531,7 +535,7 @@ def process_batch(user_id, filepaths, ts):
     else:
         # ── FALLBACK: Old Parallel Vision Method ─────────────────────────────
         print(f"[!] Reconstructor failed ({twin_err}), falling back to direct vision", flush=True)
-        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+        with ThreadPoolExecutor(max_workers=2) as pool:
             fut_gpt    = pool.submit(call_gpt_vision,    filepaths)
             fut_claude = pool.submit(call_claude_vision, filepaths)
             gpt_r, gpt_err = fut_gpt.result()
@@ -610,8 +614,8 @@ def process_batch(user_id, filepaths, ts):
 def reconnect_node():
     """Queue a reconnect command for the specified node."""
     data = request.json or {}
-    if SECRET_KEY and data.get("secret") != SECRET_KEY:
-        if request.headers.get("X-Secret") != SECRET_KEY:
+    if API_SECRET_KEY and data.get("secret") != API_SECRET_KEY:
+        if request.headers.get("X-Secret") != API_SECRET_KEY:
             return "Unauthorized", 401
     user_id = str(data.get("user_id"))
     reconnect_queue[user_id] = True
@@ -621,10 +625,10 @@ def reconnect_node():
 @app.route("/vibrate", methods=["POST"])
 def vibrate():
     """Manually add a vibration command to the queue."""
-    if SECRET_KEY and request.headers.get("X-Secret") != SECRET_KEY:
+    if API_SECRET_KEY and request.headers.get("X-Secret") != API_SECRET_KEY:
         # Check either header or JSON secret for flexibility from browser
         data = request.json or {}
-        if data.get("secret") != SECRET_KEY:
+        if data.get("secret") != API_SECRET_KEY:
             return "Unauthorized", 401
 
     data = request.json
@@ -645,8 +649,8 @@ def vibrate():
 def set_tg_user():
     """Map a node ID to a Telegram username or user ID for group mentions."""
     data = request.json or {}
-    if SECRET_KEY and data.get("secret") != SECRET_KEY:
-        if request.headers.get("X-Secret") != SECRET_KEY:
+    if API_SECRET_KEY and data.get("secret") != API_SECRET_KEY:
+        if request.headers.get("X-Secret") != API_SECRET_KEY:
             return "Unauthorized", 401
     node_id = str(data.get("node_id", ""))
     tg_user = str(data.get("tg_user", "")).strip()
@@ -674,7 +678,7 @@ def upload():
     rssi = request.headers.get("X-RSSI")
     print(f"[*] Received upload from User {user_id} (RSSI: {rssi})", flush=True)
 
-    if SECRET_KEY and request.headers.get("X-Secret") != SECRET_KEY:
+    if API_SECRET_KEY and request.headers.get("X-Secret") != API_SECRET_KEY:
         return "Unauthorized", 401
 
     if "file" not in request.files:
@@ -727,7 +731,45 @@ def upload():
 
 # --- DASHBOARD ROUTES ---
 
+# --- AUTHENTICATION ---
+def login_required(f):
+    @functools.wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get("logged_in"):
+            return redirect(url_for("login", next=request.url))
+        return f(*args, **kwargs)
+    return decorated_function
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        password = request.form.get("password")
+        # Professional hashing check
+        master_hash = os.getenv("MASTER_PASSWORD_HASH")
+        
+        # Security: if no hash is set, we use a default one for "123456" 
+        # (pbkdf2:sha256:600000$...) to prevent locking out, but warn in logs.
+        if not master_hash:
+            # Default hash for 'admin'
+            master_hash = "pbkdf2:sha256:600000$8pW0c2vU$e66d93617be3af32b724f5a7d32c0f2095cc6063b0e1e695d7f3f38012b1897d"
+            print("[!] WARNING: MASTER_PASSWORD_HASH not set. Using default 'admin'.", flush=True)
+
+        if check_password_hash(master_hash, password):
+            session["logged_in"] = True
+            session.permanent = True  # Keep logged in based on browser session
+            return redirect(request.args.get("next") or url_for("dashboard"))
+        else:
+            return render_template("login.html", error="Invalid password")
+            
+    return render_template("login.html")
+
+@app.route("/logout")
+def logout():
+    session.pop("logged_in", None)
+    return redirect(url_for("login"))
+
 @app.route("/dashboard")
+@login_required
 def dashboard():
     now = time.time()
     all_users = {}
@@ -745,6 +787,7 @@ def dashboard():
     return render_template("dashboard.html", users=all_users)
 
 @app.route("/user/<user_id>")
+@login_required
 def user_history(user_id):
     now = time.time()
     uid_str = str(user_id)
