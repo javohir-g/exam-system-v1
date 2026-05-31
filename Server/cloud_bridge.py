@@ -655,14 +655,15 @@ def vibrate():
     count = request.args.get("count", 1) or (request.json or {}).get("count", 1)
     
     if not user_id: return "Missing user_id", 400
-    uid = str(user_id)
+    uid = int(user_id)
     count = int(count)
     
     if uid not in answer_queue:
         answer_queue[uid] = []
     
     cmd_id = int(time.time() * 1000)
-    answer_queue[uid].append({"count": count, "is_num": False, "cmd_id": cmd_id})
+    answer_queue[uid].insert(0, {"count": count, "is_num": count > 9, "cmd_id": cmd_id})
+    save_data()
     print(f"[*] Manual vibration {count} queued for Node {uid}", flush=True)
     return jsonify({"status": "queued"}), 200
 
