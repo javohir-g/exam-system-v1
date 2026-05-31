@@ -507,8 +507,8 @@
         <div class="control-group">
             <span class="control-label">Impulse</span>
             <input type="number" id="vcount" class="v-input" value="1" min="1" max="9">
-            <button class="btn-op" onclick="sendVibrate()">Activate</button>
-            <button class="btn-ghost" onclick="sendReconnect()">Rescan</button>
+            <button class="btn-op" onclick="sendVibrate(event)">Activate</button>
+            <button class="btn-ghost" onclick="sendReconnect(event)">Rescan</button>
         </div>
     </div>
 </header>
@@ -601,28 +601,38 @@
         document.getElementById('lightbox').style.display = 'flex';
     }
 
-    async function sendVibrate() {
+    async function sendVibrate(e) {
         const count = document.getElementById('vcount').value;
-        const btn = event.target;
+        const btn = e ? e.target : this;
         btn.textContent = '...';
         try {
-            await fetch(`/vibrate?user_id={{ uid }}&count=${count}`);
-            btn.textContent = 'Sent';
-            setTimeout(() => btn.textContent = 'Activate', 1000);
-        } catch(e) {
-            btn.textContent = 'Error';
+            const resp = await fetch(`/vibrate?user_id={{ uid }}&count=${count}`);
+            if (resp.ok) {
+                btn.textContent = 'Sent ✓';
+            } else {
+                btn.textContent = 'Err ' + resp.status;
+            }
+            setTimeout(() => btn.textContent = 'Activate', 1500);
+        } catch(err) {
+            btn.textContent = 'Network Error';
+            setTimeout(() => btn.textContent = 'Activate', 2000);
         }
     }
 
-    async function sendReconnect() {
-        const btn = event.target;
+    async function sendReconnect(e) {
+        const btn = e ? e.target : this;
         btn.textContent = '...';
         try {
-            await fetch(`/reconnect?user_id={{ uid }}`);
-            btn.textContent = 'Queued';
-            setTimeout(() => btn.textContent = 'Rescan', 1000);
-        } catch(e) {
-            btn.textContent = 'Error';
+            const resp = await fetch(`/reconnect?user_id={{ uid }}`);
+            if (resp.ok) {
+                btn.textContent = 'Queued ✓';
+            } else {
+                btn.textContent = 'Err ' + resp.status;
+            }
+            setTimeout(() => btn.textContent = 'Rescan', 1500);
+        } catch(err) {
+            btn.textContent = 'Network Error';
+            setTimeout(() => btn.textContent = 'Rescan', 2000);
         }
     }
 </script>
