@@ -192,7 +192,7 @@ def send_to_telegram(user_id, filepaths, task_type, answer_val, matches, subtype
 def get_now():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-@app.route("/", methods=["GET"])
+@app.route("/health", methods=["GET"])
 def health():
     return "OK", 200
 
@@ -575,7 +575,7 @@ def process_batch(user_id, filepaths, ts):
             matches = final.get("matches", [])
             sorted_m = sorted(matches, key=lambda x: x.get('d', 0))
             for i, m in enumerate(sorted_m):
-                user_queue.append({"count": m.get("s", 0), "count2": 0, "cmd_id": ts + i})
+                user_queue.append({"count": m.get("s", 0), "count2": m.get("d", 0), "cmd_id": ts + i})
             tg_answer = "\n".join([f"{m.get('d')}) {m.get('s')}" for m in sorted_m])
         elif task_type == "number":
             answer_val = final.get("answer", 0)
@@ -593,10 +593,13 @@ def process_batch(user_id, filepaths, ts):
     # ── Step 5: Negative Feedback Logic ──────────────────────────────────────
     # If answer is 0, Error, or reasoning contains "insufficient data/error"
     # we send 1 brief vibration to the device.
-    negative_keywords = ["недостаточно данных", "ошибка", "пустое окно", "не могу", "непонятно", "error"]
+    negative_keywords = ["недостаточно данных", "ошибка", "пустое окно", "не могу", "непонятно"]
     is_negative = False
     
-    if not final or answer_val == 0 or any(k in reasoning.lower() for k in negative_keywords):
+    import re
+    has_error_word = bool(re.search(r'\berror\b', reasoning.lower())) if reasoning else False
+    
+    if not final or (task_type not in ("drag",) and answer_val == 0) or any(k in reasoning.lower() for k in negative_keywords) or has_error_word:
         is_negative = True
         
     if is_negative:
@@ -661,15 +664,6 @@ def vibrate():
     cmd_id = int(time.time() * 1000)
     answer_queue[uid].append({"count": count, "is_num": False, "cmd_id": cmd_id})
     print(f"[*] Manual vibration {count} queued for Node {uid}", flush=True)
-    return jsonify({"status": "queued"}), 200
-    
-    if user_id not in answer_queue:
-        answer_queue[user_id] = []
-    
-    # Priority vibration: insert at front
-    answer_queue[user_id].insert(0, {"count": count, "count2": 0, "cmd_id": int(time.time())})
-    save_data()
-    print(f"[*] Manual Vibrate: User {user_id} (count={count})", flush=True)
     return jsonify({"status": "queued"}), 200
 
 

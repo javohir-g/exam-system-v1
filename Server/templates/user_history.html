@@ -543,6 +543,8 @@
                 </div>
 
                 <div class="ans-main">
+                    {% if entry.task_type == 'choice' or entry.task_type == 'number' %}
+                        {{ entry.answer if entry.answer else 'NO_DATA' }}
                     {% elif entry.task_type == 'drag' %}
                         <span style="font-size: 1.2rem; vertical-align: middle; opacity: 0.8;">MATCHING:</span> {{ entry.matches|length }} PAIRS
                     {% else %}
@@ -559,8 +561,8 @@
                     <div class="recon-title">
                         <span>🧬 Semantic Reconstruction</span>
                     </div>
-                    {% if entry.twin.question %}
-                    <div class="recon-q">{{ entry.twin.question }}</div>
+                    {% if entry.twin.questionText %}
+                    <div class="recon-q">{{ entry.twin.questionText }}</div>
                     {% endif %}
                     <div class="recon-grid">
                         {% for m in entry.matches %}

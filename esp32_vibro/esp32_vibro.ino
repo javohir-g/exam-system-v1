@@ -201,7 +201,7 @@ void loop() {
       bool isNeg = doc["is_negative"] | false;
       long cmdId = doc["cmd_id"];
 
-      if (((count > 0 || isNum || isNeg) && cmdId != lastCommandId) || (isNeg && cmdId != lastCommandId)) {
+      if ((count > 0 || isNum || isNeg) && cmdId != lastCommandId) {
         lastCommandId = cmdId;
         sendDebugReport(count, cmdId, "vibrating");
         
