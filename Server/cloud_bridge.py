@@ -575,7 +575,7 @@ def process_batch(user_id, filepaths, ts):
             matches = final.get("matches", [])
             sorted_m = sorted(matches, key=lambda x: x.get('d', 0))
             for i, m in enumerate(sorted_m):
-                user_queue.append({"count": m.get("s", 0), "count2": m.get("d", 0), "cmd_id": ts + i})
+                user_queue.append({"count": m.get("s", 0), "count2": 0, "cmd_id": ts + i})
             tg_answer = "\n".join([f"{m.get('d')}) {m.get('s')}" for m in sorted_m])
         elif task_type == "number":
             answer_val = final.get("answer", 0)
