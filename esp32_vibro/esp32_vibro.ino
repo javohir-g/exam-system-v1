@@ -106,7 +106,7 @@ void vibrate(int times) {
     Serial.print("Pulse ");
     Serial.println(i + 1);
     digitalWrite(MOTOR_PIN, HIGH);
-    delay(300); // 0.3 second vibration
+    delay(700); // 0.7 second vibration
     digitalWrite(MOTOR_PIN, LOW);
     delay(300);  // 0.3 second pause
   }
