@@ -106,19 +106,30 @@ void vibrate(int times) {
     Serial.print("Pulse ");
     Serial.println(i + 1);
     digitalWrite(MOTOR_PIN, HIGH);
-    delay(1000); // 1.0 second vibration
+    delay(300); // 0.3 second vibration
     digitalWrite(MOTOR_PIN, LOW);
-    delay(500);  // 0.5 second pause
+    delay(300);  // 0.3 second pause
   }
   Serial.println("--- VIBRATION DONE ---");
+}
+
+void vibrateError() {
+  Serial.println("--- ERROR VIBRATION (STUTTER) ---");
+  for (int i = 0; i < 3; i++) {
+    digitalWrite(MOTOR_PIN, HIGH);
+    delay(100); 
+    digitalWrite(MOTOR_PIN, LOW);
+    delay(100); 
+  }
+  Serial.println("--- ERROR DONE ---");
 }
 
 void vibrateZero() {
   Serial.println("--- ZERO VIBRATION (LONG) ---");
   digitalWrite(MOTOR_PIN, HIGH);
-  delay(1500); // 1.5 seconds for a zero
+  delay(1000); // 1.0 seconds for a zero
   digitalWrite(MOTOR_PIN, LOW);
-  delay(500);
+  delay(300);
   Serial.println("--- ZERO DONE ---");
 }
 
@@ -206,15 +217,15 @@ void loop() {
         sendDebugReport(count, cmdId, "vibrating");
         
         if (isNeg) {
-          Serial.println("[HAPTIC] Negative result detected. 1 short pulse.");
-          vibrate(1);
+          Serial.println("[HAPTIC] Negative result detected. Stutter pulse.");
+          vibrateError();
         } else if (isNum) {
           String s = String(count);
           for(int i = 0; i < s.length(); i++) {
             int d = s.charAt(i) - '0';
             if (d == 0) vibrateZero();
             else vibrate(d);
-            if (i < s.length() - 1) delay(2000);
+            if (i < s.length() - 1) delay(1500);
           }
         } else if (count2 > 0) {
           vibrateDrag(count, count2);
