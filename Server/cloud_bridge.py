@@ -162,7 +162,7 @@ def send_to_telegram(user_id, filepaths, task_type, answer_val, matches, subtype
     """Send screenshot(s) + structured AI result to Telegram."""
     token   = os.environ.get("TELEGRAM_BOT_TOKEN", "")
     chat_id = os.environ.get("TELEGRAM_CHAT_ID", "")
-    if not token or not chat_id:
+    if not token:
         return
 
     try:
@@ -171,11 +171,21 @@ def send_to_telegram(user_id, filepaths, task_type, answer_val, matches, subtype
         if isinstance(filepaths, str):
             filepaths = [filepaths]
 
+        # Use the specific user's chat ID if it's a numeric ID, otherwise fall back to the default group chat_id
+        target_chat_id = chat_id
+        user_tg = tg_users.get(str(user_id), "").strip()
+        if user_tg.isdigit() or (user_tg.startswith("-") and user_tg[1:].isdigit()):
+            target_chat_id = user_tg
+
+        if not target_chat_id:
+            print(f"[TG] Error: No chat_id or private Telegram ID found for User {user_id}", flush=True)
+            return
+
         if len(filepaths) == 1:
             with open(filepaths[0], "rb") as photo:
                 r = requests.post(
                     f"https://api.telegram.org/bot{token}/sendPhoto",
-                    data={"chat_id": chat_id, "caption": caption, "parse_mode": "Markdown"},
+                    data={"chat_id": target_chat_id, "caption": caption, "parse_mode": "Markdown"},
                     files={"photo": photo},
                     timeout=15
                 )
@@ -193,7 +203,7 @@ def send_to_telegram(user_id, filepaths, task_type, answer_val, matches, subtype
                 media.append(item)
             r = requests.post(
                 f"https://api.telegram.org/bot{token}/sendMediaGroup",
-                data={"chat_id": chat_id, "media": json.dumps(media)},
+                data={"chat_id": target_chat_id, "media": json.dumps(media)},
                 files=files,
                 timeout=30
             )
