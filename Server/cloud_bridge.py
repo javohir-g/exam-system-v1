@@ -352,7 +352,17 @@ def _build_exam_prompt(n_images):
     prefix = (
         f"You are an expert exam analyst examining {n_images} screenshot(s). "
     ) if n_images > 1 else "You are an expert exam analyst. "
-    return prefix + "Analyze the question and return raw JSON: {\"type\": \"choice|drag|number\", \"answer\": <int>, \"confidence\": <float>, \"reasoning\": \"...\", \"matches\": []}"
+    return (
+        prefix +
+        "Analyze the question and return raw JSON:\n"
+        "{\n"
+        "  \"type\": \"choice|drag|number\",\n"
+        "  \"answer\": <int>,\n"
+        "  \"confidence\": <float>,\n"
+        "  \"reasoning\": \"... (2-6 words in Russian)\",\n"
+        "  \"matches\": [{\"s\": <int>, \"d\": <int>}]  // ONLY for 'drag' type: match each slot d (1, 2, 3...) to item s (1, 2, 3...)\n"
+        "}"
+    )
 
 def _parse_ai_json(raw_text):
     """Extract and parse JSON from raw AI response text."""
@@ -554,9 +564,13 @@ def process_batch(user_id, filepaths, ts):
         if claude_r and claude_r.get("confidence", 0) > 0.5:
             final = claude_r
             verdict = "direct_claude"
+            reasoning = final.get("reasoning", "OK")
+            confidence = final.get("confidence", 0.0)
         elif gpt_r:
             final = gpt_r
             verdict = "direct_gpt"
+            reasoning = final.get("reasoning", "OK")
+            confidence = final.get("confidence", 0.0)
         else:
             reasoning = f"Fallback fail: GPT={gpt_err}, CL={cl_err}"
 
