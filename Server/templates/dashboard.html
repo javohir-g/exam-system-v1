@@ -390,6 +390,7 @@
                     <div class="node-info">
                         <span class="node-num">Node {{ "%02d"|format(uid|int) }}</span>
                         <span class="node-status">{{ 'Connected' if data.esp_online else 'Offline' }}</span>
+                        <span class="tg-badge" style="font-size: 0.7rem; color: var(--accent); margin-top: 4px; font-weight: 600; display: none; align-items: center; gap: 4px;"></span>
                     </div>
                     <div class="indicator-group">
                         <div class="indicator {{ 'on' if data.esp_online else 'off' }}"></div>

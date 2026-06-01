@@ -66,6 +66,22 @@ def save_data():
 
 load_data()
 
+# Load default mappings from environment variables (.env)
+for key, value in os.environ.items():
+    if key.startswith("NODE_") and key.endswith("_TG"):
+        parts = key.split("_")
+        if len(parts) >= 3 and parts[1].isdigit():
+            node_id = parts[1]
+            tg_users[node_id] = value.strip()
+
+tg_map_env = os.getenv("TG_USERS_MAP", "")
+if tg_map_env:
+    for pair in tg_map_env.split(","):
+        if ":" in pair:
+            nid, tg = pair.split(":", 1)
+            tg_users[nid.strip()] = tg.strip()
+
+
 # --- TELEGRAM NOTIFICATIONS ---
 def _build_tg_caption(user_id, task_type, answer_val, matches, subtype, reasoning, confidence, gpt_res=None, claude_res=None, verdict="—"):
     """Build a structured, premium Telegram caption for exam results."""
