@@ -83,7 +83,7 @@ if tg_map_env:
 
 
 # --- TELEGRAM NOTIFICATIONS ---
-def _build_tg_caption(user_id, task_type, answer_val, matches, subtype, reasoning, confidence, gpt_res=None, claude_res=None, verdict="—", full_answer_text=None):
+def _build_tg_caption(user_id, task_type, answer_val, matches, subtype, reasoning, confidence, gpt_res=None, claude_res=None, verdict="—", full_answer_text=None, code_snippet=None):
     """Build a structured, premium Telegram caption for exam results."""
     LETTERS = {1: "A", 2: "B", 3: "C", 4: "D", 5: "E", 6: "F"}
     tg_mention = tg_users.get(str(user_id), "").replace("_", "\\_")
@@ -130,7 +130,8 @@ def _build_tg_caption(user_id, task_type, answer_val, matches, subtype, reasonin
             "matching": "🔗 MATCHING", "ordering": "🔢 ORDERING",
             "fill_gap": "✏️ FILL GAP", "category": "📂 CATEGORY"
         }.get(subtype, "🖱 DRAG & DROP"),
-        "number": "🔢 NUMERIC ANSWER"
+        "number": "🔢 NUMERIC ANSWER",
+        "code": "💻 CODE ANALYSIS"
     }.get(task_type, "❓ UNKNOWN")
 
     # Content building
@@ -141,21 +142,32 @@ def _build_tg_caption(user_id, task_type, answer_val, matches, subtype, reasonin
         body = f"{rows}\n"
     elif task_type == "number":
         body = f"   Ответ: `{answer_val}`\n"
+    elif task_type == "code":
+        body = f"   💻 *Code Question*\n   Ответ: `{full_answer_text}`\n" if full_answer_text else "   💻 *Code Analysis*\n"
     else:  # choice
         letter = LETTERS.get(answer_val, "?")
         body = f"   ✅ *{letter}* (option {answer_val})\n"
     
     # Add full answer text if provided (for open-ended questions without options)
     full_answer_section = ""
-    if full_answer_text:
+    if full_answer_text and task_type != "code":
         full_answer_esc = str(full_answer_text).replace("_", "\\_")
         full_answer_section = f"\n📝 *Full Answer:*\n`{full_answer_esc}`\n"
+
+    # Add code snippet if provided
+    code_section = ""
+    if code_snippet:
+        # Limit code display to 200 chars in Telegram to avoid message size issues
+        code_limited = code_snippet[:200] + "..." if len(code_snippet) > 200 else code_snippet
+        code_esc = str(code_limited).replace("_", "\\_")
+        code_section = f"\n```\n{code_esc}\n```\n"
 
     return (
         f"{header}\n"
         f"━━━━━━━━━━━━━━━━\n"
         f"*{task_label}*\n\n"
         f"{body}\n"
+        f"{code_section}"
         f"{full_answer_section}"
         f"━━━━━━━━━━━━━━━━\n"
         f"{gpt_line}  {claude_line}\n"
@@ -165,7 +177,7 @@ def _build_tg_caption(user_id, task_type, answer_val, matches, subtype, reasonin
     )
 
 
-def send_to_telegram(user_id, filepaths, task_type, answer_val, matches, subtype, reasoning, confidence, gpt_res=None, claude_res=None, verdict="—", full_answer_text=None):
+def send_to_telegram(user_id, filepaths, task_type, answer_val, matches, subtype, reasoning, confidence, gpt_res=None, claude_res=None, verdict="—", full_answer_text=None, code_snippet=None):
     """Send screenshot(s) + structured AI result to Telegram."""
     token   = os.environ.get("TELEGRAM_BOT_TOKEN", "")
     chat_id = os.environ.get("TELEGRAM_CHAT_ID", "")
@@ -173,7 +185,7 @@ def send_to_telegram(user_id, filepaths, task_type, answer_val, matches, subtype
         return
 
     try:
-        caption = _build_tg_caption(user_id, task_type, answer_val, matches, subtype, reasoning, confidence, gpt_res, claude_res, verdict, full_answer_text)
+        caption = _build_tg_caption(user_id, task_type, answer_val, matches, subtype, reasoning, confidence, gpt_res, claude_res, verdict, full_answer_text, code_snippet)
 
         if isinstance(filepaths, str):
             filepaths = [filepaths]
@@ -337,22 +349,25 @@ def _build_reconstruction_prompt(n_images):
         prefix +
         "═══ TASK: EXTRACT ELEMENTS ═══\n"
         "1. questionText: Full text of the question (copy verbatim, no matter the language)\n"
-        "2. taskType: Pick ONE: 'choice' | 'drag' | 'number'\n"
+        "2. taskType: Pick ONE: 'choice' | 'drag' | 'number' | 'code'\n"
         "3. For 'choice': list all radio/checkbox options (index 1=A, 2=B...):\n"
         "   options: [{\"id\": 1, \"text\": \"...\"}]\n"
         "4. For 'drag': list all SLOTS (drop zones, top-to-bottom) and ITEMS (draggable, left-to-right):\n"
         "   slots: [{\"id\": 1, \"label\": \"...\"}]\n"
         "   items: [{\"id\": 1, \"text\": \"...\"}]\n"
-        "5. subtype: 'matching' | 'ordering' | 'fill_gap' | 'category' | 'n/a'\n\n"
+        "5. For 'code': extract the code snippet exactly as shown, including language/syntax\n"
+        "   code_snippet: \"... full code ...\"\n"
+        "6. subtype: 'matching' | 'ordering' | 'fill_gap' | 'category' | 'n/a'\n\n"
 
         "═══ RULES ═══\n"
         "• Copy text EXACTLY — include typos or symbols\n"
         "• For 'drag': slot ID d=1,2,3... top-to-bottom; item ID s=1,2,3... left-to-right\n"
         "• If a button has no text, describe its icon in brackets: [plus icon]\n"
         "• If question does not contain options to choose (like A B C D ...), answer only with 'short_answer' field\n"
+        "• If question contains CODE (Python, JavaScript, Java, C++, etc.), set taskType to 'code' and extract code_snippet\n"
         "• Respond ONLY with raw JSON:\n\n"
-        "{\"taskType\": \"choice|drag|number\", \"subtype\": \"...\", \"questionText\": \"...\", "
-        "\"options\": [], \"slots\": [], \"items\": [], \"short_answer\": \"...\"}"
+        "{\"taskType\": \"choice|drag|number|code\", \"subtype\": \"...\", \"questionText\": \"...\", "
+        "\"options\": [], \"slots\": [], \"items\": [], \"code_snippet\": \"\", \"short_answer\": \"...\"}"
     )
 
 def _build_reasoning_prompt(digital_twin):
@@ -369,6 +384,9 @@ def _build_reasoning_prompt(digital_twin):
         "  - Use each item ONLY ONCE unless it's a category task.\n"
         "  - If no match fits a slot, set s=0.\n"
         "• 'number': Calculate the correct integer and put it in 'answer'.\n"
+        "• 'code': Analyze the code snippet and provide the answer or explanation in 'full_answer'.\n"
+        "  - Read the code carefully, understand its logic, and provide the correct answer.\n"
+        "  - For code analysis questions, output only the answer/result in 'full_answer' without code reproduction.\n"
         "• If the question does not contain options to choose (like A B C D ...), provide only the short answer without explanation in 'full_answer' field.\n\n"
 
         "═══ QUALITY ═══\n"
@@ -376,7 +394,7 @@ def _build_reasoning_prompt(digital_twin):
         "• 'confidence': 0.0 to 1.0 (your real certainty).\n"
         "• 'reasoning': 2-6 words in RUSSIAN.\n\n"
         "Respond ONLY with raw JSON:\n"
-        "{\"type\": \"choice|drag|number\", \"subtype\": \"...\", \"answer\": <int>, "
+        "{\"type\": \"choice|drag|number|code\", \"subtype\": \"...\", \"answer\": <int>, "
         "\"confidence\": <float>, \"reasoning\": \"...\", "
         "\"matches\": [{\"s\": <int>, \"d\": <int>}], \"full_answer\": \"...\"}"
     )
@@ -391,12 +409,13 @@ def _build_exam_prompt(n_images):
         prefix +
         "Analyze the question and return raw JSON:\n"
         "{\n"
-        "  \"type\": \"choice|drag|number\",\n"
+        "  \"type\": \"choice|drag|number|code\",\n"
         "  \"answer\": <int>,\n"
         "  \"confidence\": <float>,\n"
         "  \"reasoning\": \"... (2-6 words in Russian)\",\n"
-        "  \"matches\": [{\"s\": <int>, \"d\": <int>}],  // ONLY for 'drag' type: match each slot d (1, 2, 3...) to item s (1, 2, 3...)\n"
-        "  \"full_answer\": \"... (if question does not contain options to choose, answer only the short answer without explanation)\"\n"
+        "  \"matches\": [{\"s\": <int>, \"d\": <int>}],  // ONLY for 'drag' type\n"
+        "  \"full_answer\": \"... (for code questions or open-ended: provide only the answer/result)\",\n"
+        "  \"code_snippet\": \"... (if code is present in the question)\"\n"
         "}"
     )
 
@@ -422,7 +441,7 @@ def call_gpt_reconstructor(filepaths):
             content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}", "detail": "high"}})
         content.append({"type": "text", "text": _build_reconstruction_prompt(len(filepaths))})
         
-        resp = client.chat.completions.create(model=model, messages=[{"role": "user", "content": content}], max_tokens=1024)
+        resp = client.chat.completions.create(model=model, messages=[{"role": "user", "content": content}], max_tokens=2048)
         parsed = _parse_ai_json(resp.choices[0].message.content.strip())
         print(f"[GPT-Reconfig] Extracted structure for {len(filepaths)} images", flush=True)
         return parsed, None
@@ -439,7 +458,7 @@ def call_claude_reasoner(digital_twin):
         import anthropic as anthropic_sdk
         client = anthropic_sdk.Anthropic(api_key=api_key)
         message = client.messages.create(
-            model=model, max_tokens=1024,
+            model=model, max_tokens=2048,
             messages=[{"role": "user", "content": _build_reasoning_prompt(digital_twin)}]
         )
         parsed = _parse_ai_json(message.content[0].text.strip())
@@ -472,7 +491,7 @@ def call_claude_reasoner_with_image(filepaths, digital_twin):
         )
         content.append({"type": "text", "text": prompt})
         
-        message = client.messages.create(model=model, max_tokens=1024, messages=[{"role": "user", "content": content}])
+        message = client.messages.create(model=model, max_tokens=2048, messages=[{"role": "user", "content": content}])
         parsed = _parse_ai_json(message.content[0].text.strip())
         print(f"[Claude-Hybrid] Verified answer. Conf={parsed.get('confidence')}", flush=True)
         return parsed, None
@@ -496,7 +515,7 @@ def call_gpt_vision(filepaths):
                 b64 = base64.b64encode(f.read()).decode()
             content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}", "detail": "high"}})
         content.append({"type": "text", "text": _build_exam_prompt(len(filepaths))})
-        resp = client.chat.completions.create(model=model, messages=[{"role": "user", "content": content}], max_tokens=1024)
+        resp = client.chat.completions.create(model=model, messages=[{"role": "user", "content": content}], max_tokens=2048)
         return _parse_ai_json(resp.choices[0].message.content.strip()), None
     except Exception as e:
         return None, str(e)
@@ -515,7 +534,7 @@ def call_claude_vision(filepaths):
                 b64 = base64.b64encode(f.read()).decode()
             content.append({"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}})
         content.append({"type": "text", "text": _build_exam_prompt(len(filepaths))})
-        message = client.messages.create(model=model, max_tokens=1024, messages=[{"role": "user", "content": content}])
+        message = client.messages.create(model=model, max_tokens=2048, messages=[{"role": "user", "content": content}])
         return _parse_ai_json(message.content[0].text.strip()), None
     except Exception as e:
         return None, str(e)
@@ -542,7 +561,7 @@ def call_gpt_verifier(filepaths, gpt_result, claude_result):
             "Return best JSON."
         )
         content.append({"type": "text", "text": prompt})
-        resp = client.chat.completions.create(model=model, messages=[{"role": "user", "content": content}], max_tokens=1024)
+        resp = client.chat.completions.create(model=model, messages=[{"role": "user", "content": content}], max_tokens=2048)
         return _parse_ai_json(resp.choices[0].message.content.strip()), None
     except Exception as e:
         return None, str(e)
@@ -561,11 +580,15 @@ def process_batch(user_id, filepaths, ts):
     claude_r = None
     verdict = "—"
     full_answer_text = None
+    code_snippet = None
 
     # ── Step 1: GPT Reconstruction (Digital Twin) ────────────────────────────
     twin, twin_err = call_gpt_reconstructor(filepaths)
     
     if twin:
+        # Extract code snippet if available
+        code_snippet = twin.get("code_snippet", None)
+        
         # ── Step 2: Claude Reasoning (Text-only) ─────────────────────────────
         final, cl_err = call_claude_reasoner(twin)
         
@@ -608,12 +631,14 @@ def process_batch(user_id, filepaths, ts):
             reasoning = final.get("reasoning", "OK")
             confidence = final.get("confidence", 0.0)
             full_answer_text = final.get("full_answer", None)
+            code_snippet = final.get("code_snippet", None)
         elif gpt_r:
             final = gpt_r
             verdict = "direct_gpt"
             reasoning = final.get("reasoning", "OK")
             confidence = final.get("confidence", 0.0)
             full_answer_text = final.get("full_answer", None)
+            code_snippet = final.get("code_snippet", None)
         else:
             reasoning = f"Fallback fail: GPT={gpt_err}, CL={cl_err}"
 
@@ -638,6 +663,10 @@ def process_batch(user_id, filepaths, ts):
             answer_val = final.get("answer", 0)
             user_queue.append({"count": answer_val, "count2": 0, "cmd_id": ts, "is_num": True})
             tg_answer = str(answer_val)
+        elif task_type == "code":
+            # For code questions, use the full_answer as the answer
+            tg_answer = full_answer_text if full_answer_text else "No answer extracted"
+            answer_val = 0
         else: # choice
             answer_val = final.get("answer", 0)
             user_queue.append({"count": answer_val, "count2": 0, "cmd_id": ts})
@@ -656,7 +685,7 @@ def process_batch(user_id, filepaths, ts):
     import re
     has_error_word = bool(re.search(r'\berror\b', reasoning.lower())) if reasoning else False
     
-    if not final or (task_type not in ("drag",) and answer_val == 0) or any(k in reasoning.lower() for k in negative_keywords) or has_error_word:
+    if not final or (task_type not in ("drag", "code") and answer_val == 0) or any(k in reasoning.lower() for k in negative_keywords) or has_error_word:
         is_negative = True
         
     if is_negative:
@@ -683,7 +712,8 @@ def process_batch(user_id, filepaths, ts):
         "twin": twin,  # Save as dict for direct template access
         "gpt_res": gpt_r,
         "claude_res": claude_r,
-        "full_answer": full_answer_text
+        "full_answer": full_answer_text,
+        "code_snippet": code_snippet
     })
     
     # Small wrapper to call TG
@@ -691,7 +721,7 @@ def process_batch(user_id, filepaths, ts):
         user_id, filepaths, 
         task_type, answer_val, matches, subtype,
         reasoning, confidence,
-        gpt_res=gpt_r, claude_res=claude_r, verdict=verdict, full_answer_text=full_answer_text
+        gpt_res=gpt_r, claude_res=claude_r, verdict=verdict, full_answer_text=full_answer_text, code_snippet=code_snippet
     )
     save_data()
 
