@@ -83,7 +83,7 @@ if tg_map_env:
 
 
 # --- TELEGRAM NOTIFICATIONS ---
-def _build_tg_caption(user_id, task_type, answer_val, matches, subtype, reasoning, confidence, gpt_res=None, claude_res=None, verdict="—"):
+def _build_tg_caption(user_id, task_type, answer_val, matches, subtype, reasoning, confidence, gpt_res=None, claude_res=None, verdict="—", full_answer_text=None):
     """Build a structured, premium Telegram caption for exam results."""
     LETTERS = {1: "A", 2: "B", 3: "C", 4: "D", 5: "E", 6: "F"}
     tg_mention = tg_users.get(str(user_id), "").replace("_", "\\_")
@@ -144,12 +144,19 @@ def _build_tg_caption(user_id, task_type, answer_val, matches, subtype, reasonin
     else:  # choice
         letter = LETTERS.get(answer_val, "?")
         body = f"   ✅ *{letter}* (option {answer_val})\n"
+    
+    # Add full answer text if provided (for open-ended questions without options)
+    full_answer_section = ""
+    if full_answer_text:
+        full_answer_esc = str(full_answer_text).replace("_", "\\_")
+        full_answer_section = f"\n📝 *Full Answer:*\n`{full_answer_esc}`\n"
 
     return (
         f"{header}\n"
         f"━━━━━━━━━━━━━━━━\n"
         f"*{task_label}*\n\n"
         f"{body}\n"
+        f"{full_answer_section}"
         f"━━━━━━━━━━━━━━━━\n"
         f"{gpt_line}  {claude_line}\n"
         f"Status: {verdict_info}\n"
@@ -158,7 +165,7 @@ def _build_tg_caption(user_id, task_type, answer_val, matches, subtype, reasonin
     )
 
 
-def send_to_telegram(user_id, filepaths, task_type, answer_val, matches, subtype, reasoning, confidence, gpt_res=None, claude_res=None, verdict="—"):
+def send_to_telegram(user_id, filepaths, task_type, answer_val, matches, subtype, reasoning, confidence, gpt_res=None, claude_res=None, verdict="—", full_answer_text=None):
     """Send screenshot(s) + structured AI result to Telegram."""
     token   = os.environ.get("TELEGRAM_BOT_TOKEN", "")
     chat_id = os.environ.get("TELEGRAM_CHAT_ID", "")
@@ -166,7 +173,7 @@ def send_to_telegram(user_id, filepaths, task_type, answer_val, matches, subtype
         return
 
     try:
-        caption = _build_tg_caption(user_id, task_type, answer_val, matches, subtype, reasoning, confidence, gpt_res, claude_res, verdict)
+        caption = _build_tg_caption(user_id, task_type, answer_val, matches, subtype, reasoning, confidence, gpt_res, claude_res, verdict, full_answer_text)
 
         if isinstance(filepaths, str):
             filepaths = [filepaths]
@@ -342,9 +349,10 @@ def _build_reconstruction_prompt(n_images):
         "• Copy text EXACTLY — include typos or symbols\n"
         "• For 'drag': slot ID d=1,2,3... top-to-bottom; item ID s=1,2,3... left-to-right\n"
         "• If a button has no text, describe its icon in brackets: [plus icon]\n"
+        "• If question does not contain options to choose (like A B C D ...), answer only with 'short_answer' field\n"
         "• Respond ONLY with raw JSON:\n\n"
         "{\"taskType\": \"choice|drag|number\", \"subtype\": \"...\", \"questionText\": \"...\", "
-        "\"options\": [], \"slots\": [], \"items\": []}"
+        "\"options\": [], \"slots\": [], \"items\": [], \"short_answer\": \"...\"}"
     )
 
 def _build_reasoning_prompt(digital_twin):
@@ -360,7 +368,8 @@ def _build_reasoning_prompt(digital_twin):
         "• 'drag': Match every slot to the best item. Output 'matches': [{\"s\": item_id, \"d\": slot_id}].\n"
         "  - Use each item ONLY ONCE unless it's a category task.\n"
         "  - If no match fits a slot, set s=0.\n"
-        "• 'number': Calculate the correct integer and put it in 'answer'.\n\n"
+        "• 'number': Calculate the correct integer and put it in 'answer'.\n"
+        "• If the question does not contain options to choose (like A B C D ...), provide only the short answer without explanation in 'full_answer' field.\n\n"
 
         "═══ QUALITY ═══\n"
         "• Watch for 'NOT' or 'НЕ' in questions — think carefully.\n"
@@ -369,7 +378,7 @@ def _build_reasoning_prompt(digital_twin):
         "Respond ONLY with raw JSON:\n"
         "{\"type\": \"choice|drag|number\", \"subtype\": \"...\", \"answer\": <int>, "
         "\"confidence\": <float>, \"reasoning\": \"...\", "
-        "\"matches\": [{\"s\": <int>, \"d\": <int>}]}"
+        "\"matches\": [{\"s\": <int>, \"d\": <int>}], \"full_answer\": \"...\"}"
     )
 
 # Old prompt kept for legacy fallback
@@ -386,7 +395,8 @@ def _build_exam_prompt(n_images):
         "  \"answer\": <int>,\n"
         "  \"confidence\": <float>,\n"
         "  \"reasoning\": \"... (2-6 words in Russian)\",\n"
-        "  \"matches\": [{\"s\": <int>, \"d\": <int>}]  // ONLY for 'drag' type: match each slot d (1, 2, 3...) to item s (1, 2, 3...)\n"
+        "  \"matches\": [{\"s\": <int>, \"d\": <int>}],  // ONLY for 'drag' type: match each slot d (1, 2, 3...) to item s (1, 2, 3...)\n"
+        "  \"full_answer\": \"... (if question does not contain options to choose, answer only the short answer without explanation)\"\n"
         "}"
     )
 
@@ -550,6 +560,7 @@ def process_batch(user_id, filepaths, ts):
     gpt_r = None
     claude_r = None
     verdict = "—"
+    full_answer_text = None
 
     # ── Step 1: GPT Reconstruction (Digital Twin) ────────────────────────────
     twin, twin_err = call_gpt_reconstructor(filepaths)
@@ -565,6 +576,9 @@ def process_batch(user_id, filepaths, ts):
             # Populate for UI comparison block (GPT acted as Reconstructor)
             gpt_r = {"reasoning": "Page Structure Extracted (Digital Twin)", "confidence": 1.0, "answer": "RECON"}
             claude_r = final
+            
+            # Extract full answer if available (for open-ended questions)
+            full_answer_text = final.get("full_answer", None)
 
             # ── Step 3: Optional Hybrid Verification if confidence is low ────
             if confidence < 0.75:
@@ -574,6 +588,7 @@ def process_batch(user_id, filepaths, ts):
                     claude_r = verified
                     confidence = final.get("confidence", 0.0)
                     verdict = "hybrid_verified"
+                    full_answer_text = verified.get("full_answer", full_answer_text)
                     print(f"[*] Hybrid upgrade: confidence {confidence}", flush=True)
         else:
             reasoning = f"Reasoner fail: {cl_err}"
@@ -592,11 +607,13 @@ def process_batch(user_id, filepaths, ts):
             verdict = "direct_claude"
             reasoning = final.get("reasoning", "OK")
             confidence = final.get("confidence", 0.0)
+            full_answer_text = final.get("full_answer", None)
         elif gpt_r:
             final = gpt_r
             verdict = "direct_gpt"
             reasoning = final.get("reasoning", "OK")
             confidence = final.get("confidence", 0.0)
+            full_answer_text = final.get("full_answer", None)
         else:
             reasoning = f"Fallback fail: GPT={gpt_err}, CL={cl_err}"
 
@@ -665,7 +682,8 @@ def process_batch(user_id, filepaths, ts):
         "is_negative": is_negative,
         "twin": twin,  # Save as dict for direct template access
         "gpt_res": gpt_r,
-        "claude_res": claude_r
+        "claude_res": claude_r,
+        "full_answer": full_answer_text
     })
     
     # Small wrapper to call TG
@@ -673,7 +691,7 @@ def process_batch(user_id, filepaths, ts):
         user_id, filepaths, 
         task_type, answer_val, matches, subtype,
         reasoning, confidence,
-        gpt_res=gpt_r, claude_res=claude_r, verdict=verdict
+        gpt_res=gpt_r, claude_res=claude_r, verdict=verdict, full_answer_text=full_answer_text
     )
     save_data()
 
