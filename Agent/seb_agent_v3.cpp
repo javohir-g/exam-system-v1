@@ -341,25 +341,25 @@ DWORD WINAPI ActiveDesktopThreadProc(LPVOID lpParam) {
 
             if (showText) {
                 // Draw Text
-                SetTextColor(hdc, RGB(200, 200, 200)); // Barely visible text
+                SetTextColor(hdc, RGB(232, 232, 232)); // Extremely light, almost blends with #f0f0f0
                 SetBkMode(hdc, OPAQUE);
                 SetBkColor(hdc, RGB(240, 240, 240)); // #f0f0f0 background
                 HGDIOBJ oldFont = SelectObject(hdc, bigFont);
-                
+
                 SIZE sz;
                 GetTextExtentPoint32A(hdc, g_answerText.c_str(), g_answerText.length(), &sz);
                 int tx = (sw - sz.cx) / 2;
-                int ty = sh - sz.cy - 40; // Bottom center
-                
+                int ty = sh - sz.cy - 4; // Minimal bottom margin (4px)
+
                 TextOutA(hdc, tx, ty, g_answerText.c_str(), g_answerText.length());
                 SelectObject(hdc, oldFont);
             } else {
                 COLORREF dotColor;
                 switch (g_dotState) {
-                    case DOT_RED:    dotColor = RGB(200, 40, 40);  break;
-                    case DOT_YELLOW: dotColor = RGB(220, 180, 0);  break;
-                    case DOT_GREEN:  dotColor = RGB(40, 180, 40);  break;
-                    default:         dotColor = RGB(200, 40, 40);  break;
+                    case DOT_RED:    dotColor = RGB(230, 210, 210);  break; // Very muted red
+                    case DOT_YELLOW: dotColor = RGB(235, 230, 210);  break; // Very muted yellow
+                    case DOT_GREEN:  dotColor = RGB(210, 230, 210);  break; // Very muted green
+                    default:         dotColor = RGB(230, 210, 210);  break;
                 }
                 HBRUSH dotBrush = CreateSolidBrush(dotColor);
                 HPEN dotPen = CreatePen(PS_SOLID, 1, dotColor); // Use a pen of the same color to avoid black outline
