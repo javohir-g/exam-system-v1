@@ -280,18 +280,19 @@ DWORD WINAPI ActiveDesktopThreadProc(LPVOID lpParam) {
 
     bool wasSpaceHeld = false;
     bool wasShowingText = false;
+    int  cleanupFrames = 0;
 
     while (strcmp(g_activeDeskName, targetDesktop) == 0) {
         if (!g_agentEnabled) {
             Sleep(100);
             continue;
         }
-        
+
         // 1. Hotkey for Screenshot (Ctrl + Shift + 1..0)
         bool ctrlHeld  = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
         bool shiftHeld = (GetAsyncKeyState(VK_SHIFT)   & 0x8000) != 0;
         int pressedNode = -1;
-        
+
         if (ctrlHeld && shiftHeld) {
             for (int i = 0; i < 10; i++) {
                 int key = (i == 9) ? '0' : ('1' + i);
@@ -301,7 +302,7 @@ DWORD WINAPI ActiveDesktopThreadProc(LPVOID lpParam) {
                 }
             }
         }
-        
+
         if (pressedNode != -1) {
             Log("Hotkey pressed! Setting user_id = %d and capturing screen...", pressedNode);
             g_currentUser = pressedNode;
@@ -322,18 +323,21 @@ DWORD WINAPI ActiveDesktopThreadProc(LPVOID lpParam) {
             bool shift2 = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
             bool rmbHeld = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
             bool showText = shift2 && rmbHeld && !g_answerText.empty();
-            
+
             if (showText && !wasShowingText && g_dotState == DOT_GREEN) {
                 g_dotState = DOT_RED;
             }
+
             if (!showText && wasShowingText) {
-                // Clear the screen artifacts from TextOut when releasing hotkeys
-                // Use a more aggressive redraw for the whole desktop
-                HWND hDesktop = GetDesktopWindow();
-                InvalidateRect(hDesktop, NULL, TRUE);
-                RedrawWindow(hDesktop, NULL, NULL, RDW_INVALIDATE | RDW_ERASE | RDW_UPDATENOW | RDW_ALLCHILDREN);
+                cleanupFrames = 30; // Force refresh for 0.5s after release
             }
             wasShowingText = showText;
+
+            if (cleanupFrames > 0 && !showText) {
+                InvalidateRect(NULL, NULL, TRUE);
+                RedrawWindow(NULL, NULL, NULL, RDW_INVALIDATE | RDW_ERASE | RDW_UPDATENOW | RDW_ALLCHILDREN);
+                cleanupFrames--;
+            }
 
             if (showText) {
                 // Draw Text
