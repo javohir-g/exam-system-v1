@@ -32,22 +32,26 @@ DB_FILE = "database.json"
 # --- MULTI-USER STATE ---
 user_data = {}
 answer_queue = {}
+agent_answer_queue = {} # user_id -> string (e.g. "3 (C)")
 reconnect_queue = {}  # user_id -> True
 heartbeats = {}  # user_id -> last_seen_timestamp
 tg_users = {}  # user_id -> "@username" or "123456789" (Telegram user)
+GLOBAL_AGENT_ENABLED = False
 
 # --- PHOTO BUFFER (3-second server-side batching) ---
 # {user_id: {"files": [...], "timer": threading.Timer}}
 pending_uploads = {}
 
 def load_data():
-    global user_data, answer_queue
+    global user_data, answer_queue, agent_answer_queue, GLOBAL_AGENT_ENABLED
     if os.path.exists(DB_FILE):
         try:
             with open(DB_FILE, "r") as f:
                 db = json.load(f)
                 user_data = db.get("user_data", {})
                 answer_queue = db.get("answer_queue", {})
+                agent_answer_queue = db.get("agent_answer_queue", {})
+                GLOBAL_AGENT_ENABLED = db.get("global_agent_enabled", False)
                 tg_users.update(db.get("tg_users", {}))
                 print(f"[*] Data loaded from {DB_FILE}", flush=True)
         except Exception as e:
@@ -59,6 +63,8 @@ def save_data():
             json.dump({
                 "user_data": user_data,
                 "answer_queue": answer_queue,
+                "agent_answer_queue": agent_answer_queue,
+                "global_agent_enabled": GLOBAL_AGENT_ENABLED,
                 "tg_users": tg_users
             }, f, indent=4)
     except Exception as e:
@@ -313,6 +319,29 @@ def poll():
         }), 200
     
     return jsonify({"count": 0, "answer": 0, "count2": 0, "cmd_id": 0, "is_num": False, "is_negative": False}), 200
+
+@app.route("/agent_poll", methods=["GET"])
+def agent_poll():
+    """Agent calls this to get its active status and any text answer."""
+    if request.args.get("secret") != API_SECRET_KEY:
+        return "Unauthorized", 401
+    
+    if not GLOBAL_AGENT_ENABLED:
+        return jsonify({"status": "disabled"}), 200
+        
+    user_id = request.args.get("user_id")
+    if not user_id:
+        return "Missing user_id", 400
+        
+    uid = str(user_id)
+    
+    if uid in agent_answer_queue and agent_answer_queue[uid]:
+        # Send answer and clear it
+        text_ans = agent_answer_queue.pop(uid)
+        save_data()
+        return jsonify({"status": "ready", "text": text_ans}), 200
+        
+    return jsonify({"status": "pending"}), 200
 
 @app.route("/esp_report", methods=["POST"])
 def esp_report():
@@ -674,6 +703,8 @@ def process_batch(user_id, filepaths, ts):
             tg_answer = f"{answer_val} ({letters.get(answer_val, '?')})"
 
         answer_queue[user_id] = user_queue
+        # Also populate the agent's queue
+        agent_answer_queue[user_id] = tg_answer
         print(f"[Final] User {user_id} -> {tg_answer} (Verdict: {verdict})", flush=True)
 
     # ── Step 5: Negative Feedback Logic ──────────────────────────────────────
@@ -846,6 +877,24 @@ def upload():
 def index():
     if not session.get("logged_in"):
         return redirect(url_for("login"))
+    
+    # Enrich user_data with online status
+    now = time.time()
+    for uid in user_data:
+        user_data[uid]["esp_online"] = (now - heartbeats.get(uid, 0)) < 15
+        user_data[uid]["is_active"] = bool(answer_queue.get(uid))
+
+    return render_template("dashboard.html", users=user_data, tg_users=tg_users, global_agent_enabled=GLOBAL_AGENT_ENABLED)
+
+@app.route("/toggle_agent_system", methods=["POST"])
+def toggle_agent_system():
+    global GLOBAL_AGENT_ENABLED
+    if not session.get("logged_in"):
+        return "Unauthorized", 401
+        
+    GLOBAL_AGENT_ENABLED = not GLOBAL_AGENT_ENABLED
+    save_data()
+    return jsonify({"status": "ok", "enabled": GLOBAL_AGENT_ENABLED}), 200
     return redirect(url_for("dashboard"))
 
 # --- AUTHENTICATION ---
