@@ -356,19 +356,17 @@ DWORD WINAPI ActiveDesktopThreadProc(LPVOID lpParam) {
             } else {
                 COLORREF dotColor;
                 switch (g_dotState) {
-                    case DOT_RED:    dotColor = RGB(230, 210, 210);  break; // Very muted red
-                    case DOT_YELLOW: dotColor = RGB(235, 230, 210);  break; // Very muted yellow
-                    case DOT_GREEN:  dotColor = RGB(210, 230, 210);  break; // Very muted green
-                    default:         dotColor = RGB(230, 210, 210);  break;
+                    case DOT_RED:    dotColor = RGB(220, 160, 160);  break; // More visible but muted red
+                    case DOT_YELLOW: dotColor = RGB(225, 220, 160);  break; // More visible but muted yellow
+                    case DOT_GREEN:  dotColor = RGB(160, 220, 160);  break; // More visible but muted green
+                    default:         dotColor = RGB(220, 160, 160);  break;
                 }
                 HBRUSH dotBrush = CreateSolidBrush(dotColor);
-                HPEN dotPen = CreatePen(PS_SOLID, 1, dotColor); // Use a pen of the same color to avoid black outline
+                HGDIOBJ oldPen = SelectObject(hdc, GetStockObject(NULL_PEN));
                 HGDIOBJ oldBrush = SelectObject(hdc, dotBrush);
-                HGDIOBJ oldPen = SelectObject(hdc, dotPen);
                 Ellipse(hdc, sw - 10, sh - 10, sw - 6, sh - 6);
-                SelectObject(hdc, oldPen);
                 SelectObject(hdc, oldBrush);
-                DeleteObject(dotPen);
+                SelectObject(hdc, oldPen);
                 DeleteObject(dotBrush);
             }
             ReleaseDC(NULL, hdc);

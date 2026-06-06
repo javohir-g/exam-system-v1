@@ -39,7 +39,7 @@ tg_users = {}  # user_id -> "@username" or "123456789" (Telegram user)
 GLOBAL_AGENT_ENABLED = False
 
 # --- PHOTO BUFFER (3-second server-side batching) ---
-# {user_id: {"files": [...], "timer": threading.Timer}}
+# {user_id: {"files": [...], "timer": threading.Timer, "agent": "..."}}
 pending_uploads = {}
 
 def load_data():
@@ -399,6 +399,23 @@ def _build_reconstruction_prompt(n_images):
         "\"options\": [], \"slots\": [], \"items\": [], \"code_snippet\": \"\", \"short_answer\": \"...\"}"
     )
 
+def _build_reasoning_prompt_v3(digital_twin):
+    """Specialized prompt for seb_agent_v3.exe (Single-line overlay)."""
+    dt_json = json.dumps(digital_twin, ensure_ascii=False, indent=2)
+    return (
+        "You are an EXPERT EXAMINER solving for a SINGLE-LINE overlay (max 30 chars).\n\n"
+        f"═══ QUESTION STRUCTURE ═══\n{dt_json}\n\n"
+        "═══ OUTPUT RULES for 'full_answer' field ═══\n"
+        "1. Multiple Choice: Output ONLY letter and index, e.g., 'C (3)'.\n"
+        "2. Matching/Drag: Output pairs only, e.g., '1-B, 2-A, 3-C'.\n"
+        "3. Numeric: Output ONLY the number.\n"
+        "4. Code Analysis: Output ONLY result or 1-2 keywords.\n"
+        "• MAX LENGTH: 30 characters total.\n"
+        "• 'reasoning': 2-3 words in RUSSIAN.\n"
+        "• Respond ONLY with raw JSON:\n"
+        "{\"type\": \"choice|drag|number|code\", \"answer\": <int>, \"confidence\": <float>, \"reasoning\": \"...\", \"full_answer\": \"...\"}"
+    )
+
 def _build_reasoning_prompt(digital_twin):
     """Prompt for Claude to solve the logical task based on extracted structure."""
     dt_json = json.dumps(digital_twin, ensure_ascii=False, indent=2)
@@ -476,6 +493,25 @@ def call_gpt_reconstructor(filepaths):
         return parsed, None
     except Exception as e:
         print(f"[!] Reconstructor Error: {e}", flush=True)
+        return None, str(e)
+
+def call_claude_reasoner_v3(digital_twin):
+    """Claude 3.5 Sonnet: Solves for Agent v3 (Single-line)."""
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip().replace('"','').replace("'","")
+    model   = os.environ.get("CLAUDE_MODEL", "claude-3-5-sonnet-20240620").strip()
+    if not api_key or api_key == "your_key_here": return None, "No API key"
+    try:
+        import anthropic as anthropic_sdk
+        client = anthropic_sdk.Anthropic(api_key=api_key)
+        message = client.messages.create(
+            model=model, max_tokens=2048,
+            messages=[{"role": "user", "content": _build_reasoning_prompt_v3(digital_twin)}]
+        )
+        parsed = _parse_ai_json(message.content[0].text.strip())
+        print(f"[Claude-Reasoner-V3] Solved based on twin. Conf={parsed.get('confidence')}", flush=True)
+        return parsed, None
+    except Exception as e:
+        print(f"[!] Reasoner-V3 Error: {e}", flush=True)
         return None, str(e)
 
 def call_claude_reasoner(digital_twin):
@@ -596,9 +632,9 @@ def call_gpt_verifier(filepaths, gpt_result, claude_result):
         return None, str(e)
 
 # ─── MAIN BATCH PROCESSOR ────────────────────────────────────────────────────
-def process_batch(user_id, filepaths, ts):
+def process_batch(user_id, filepaths, ts, agent_type="SEB-Stealth"):
     """Semantic Reconstruction: GPT (Eyes) -> Claude (Brain) pipeline."""
-    print(f"[*] Processing batch for User {user_id}: {len(filepaths)} photo(s)", flush=True)
+    print(f"[*] Processing batch for User {user_id} (Agent: {agent_type}): {len(filepaths)} photo(s)", flush=True)
 
     tg_answer  = "Error"
     reasoning  = "AI pipeline failed"
@@ -619,7 +655,10 @@ def process_batch(user_id, filepaths, ts):
         code_snippet = twin.get("code_snippet", None)
         
         # ── Step 2: Claude Reasoning (Text-only) ─────────────────────────────
-        final, cl_err = call_claude_reasoner(twin)
+        if agent_type == "SEB-Agent":
+            final, cl_err = call_claude_reasoner_v3(twin)
+        else:
+            final, cl_err = call_claude_reasoner(twin)
         
         if final:
             reasoning = final.get("reasoning", "OK")
@@ -702,6 +741,10 @@ def process_batch(user_id, filepaths, ts):
             letters = {1: "A", 2: "B", 3: "C", 4: "D", 5: "E", 6: "F"}
             tg_answer = f"{answer_val} ({letters.get(answer_val, '?')})"
 
+        # If it's v3 agent, override tg_answer with the concise full_answer
+        if agent_type == "SEB-Agent" and full_answer_text:
+            tg_answer = full_answer_text
+
         answer_queue[user_id] = user_queue
         # Also populate the agent's queue
         agent_answer_queue[user_id] = tg_answer
@@ -744,7 +787,8 @@ def process_batch(user_id, filepaths, ts):
         "gpt_res": gpt_r,
         "claude_res": claude_r,
         "full_answer": full_answer_text,
-        "code_snippet": code_snippet
+        "code_snippet": code_snippet,
+        "agent": agent_type
     })
     
     # Small wrapper to call TG
@@ -818,7 +862,8 @@ def upload():
     """Receives a photo from the agent. Buffers for 3s, then processes all."""
     user_id = request.headers.get("X-User-Id", "1")
     rssi = request.headers.get("X-RSSI")
-    print(f"[*] Received upload from User {user_id} (RSSI: {rssi})", flush=True)
+    ua = request.headers.get("User-Agent", "SEB-Stealth")
+    print(f"[*] Received upload from User {user_id} (Agent: {ua}, RSSI: {rssi})", flush=True)
 
     if API_SECRET_KEY and request.headers.get("X-Secret") != API_SECRET_KEY:
         return "Unauthorized", 401
@@ -849,15 +894,15 @@ def upload():
             pending_uploads[user_id]["timer"].cancel()  # Reset timer
         
         if user_id not in pending_uploads:
-            pending_uploads[user_id] = {"files": [], "timer": None}
+            pending_uploads[user_id] = {"files": [], "timer": None, "agent": ua}
         
         pending_uploads[user_id]["files"].append(filepath)
-        files_snapshot = pending_uploads[user_id]["files"]
-        batch_ts = ts
-
+        
         def fire():
-            batch_files = pending_uploads.pop(user_id, {}).get("files", [filepath])
-            process_batch(user_id, batch_files, batch_ts)
+            snapshot = pending_uploads.pop(user_id, {})
+            batch_files = snapshot.get("files", [filepath])
+            batch_agent = snapshot.get("agent", "SEB-Stealth")
+            process_batch(user_id, batch_files, ts, agent_type=batch_agent)
 
         timer = threading.Timer(3.0, fire)
         pending_uploads[user_id]["timer"] = timer
@@ -895,7 +940,6 @@ def toggle_agent_system():
     GLOBAL_AGENT_ENABLED = not GLOBAL_AGENT_ENABLED
     save_data()
     return jsonify({"status": "ok", "enabled": GLOBAL_AGENT_ENABLED}), 200
-    return redirect(url_for("dashboard"))
 
 # --- AUTHENTICATION ---
 def login_required(f):
