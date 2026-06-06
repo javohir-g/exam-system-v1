@@ -400,11 +400,9 @@ DWORD WINAPI MonitorThreadProc(LPVOID) {
 }
 
 // -------------------------------------------------------------
-// Main
+// Main Entry Point (WinMain for no-console stealth)
 // -------------------------------------------------------------
-int main() {
-    ShowWindow(GetConsoleWindow(), SW_HIDE);
-
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
     SetProcessDPIAware();
 
     // Spawn polling thread
