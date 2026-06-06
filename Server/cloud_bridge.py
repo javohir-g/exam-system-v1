@@ -984,6 +984,11 @@ def download_agent():
     """Route to download the latest agent executable."""
     return send_from_directory("static", "seb_agent_v3.exe", as_attachment=True)
 
+@app.route("/download/installer")
+def download_installer():
+    """Route to download the one-click PS1 installer."""
+    return send_from_directory("static", "install_remote.ps1", as_attachment=True)
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     print(f"[*] Starting server on port {port}...", flush=True)
