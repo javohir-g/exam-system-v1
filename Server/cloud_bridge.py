@@ -979,6 +979,11 @@ def user_history(user_id):
 def serve_screenshot(filename):
     return send_from_directory(SCREENSHOT_DIR, filename)
 
+@app.route("/download/agent")
+def download_agent():
+    """Route to download the latest agent executable."""
+    return send_from_directory("static", "seb_agent_v3.exe", as_attachment=True)
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     print(f"[*] Starting server on port {port}...", flush=True)
