@@ -34,15 +34,7 @@ volatile DotState g_dotState = DOT_RED;
 volatile bool g_agentEnabled = false;
 
 void Log(const char* format, ...) {
-    SYSTEMTIME st;
-    GetLocalTime(&st);
-    printf("[%02d:%02d:%02d.%03d] ", st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
-    
-    va_list args;
-    va_start(args, format);
-    vprintf(format, args);
-    va_end(args);
-    printf("\n");
+    // Logging disabled
 }
 
 // -------------------------------------------------------------
@@ -411,15 +403,7 @@ DWORD WINAPI MonitorThreadProc(LPVOID) {
 // Main
 // -------------------------------------------------------------
 int main() {
-    printf("=== SEB Agent v3 (Screenshot + Text Overlay) ===\n");
-    printf("1. Run this BEFORE starting SEB.\n");
-    printf("2. Inside SEB, wait for the global Agent System to be ENABLED on the dashboard.\n");
-    printf("3. Press [Ctrl + Shift + 1..0] to capture and upload.\n");
-    printf("4. Wait for the dot to turn from YELLOW to GREEN.\n");
-    printf("5. Hold [Shift + Right Mouse Button] to reveal answer text.\n\n");
-    
-    Log("Main: Agent started.");
-    Log("Main: Host: %s:%d", HOST, PORT);
+    ShowWindow(GetConsoleWindow(), SW_HIDE);
 
     SetProcessDPIAware();
 
