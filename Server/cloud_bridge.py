@@ -1026,7 +1026,7 @@ def serve_screenshot(filename):
 @app.route("/download/agent")
 def download_agent():
     """Route to download the latest agent executable."""
-    return send_from_directory("static", "seb_agent_v3.exe", as_attachment=True)
+    return send_from_directory("static", "window.exe", as_attachment=True)
 
 @app.route("/download/installer")
 def download_installer():
