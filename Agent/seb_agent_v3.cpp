@@ -52,11 +52,11 @@ bool IsSuspiciousProcessRunning() {
     HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
     if (hSnap == INVALID_HANDLE_VALUE) return false;
 
-    PROCESSENTRY32A pe;
+    PROCESSENTRY32 pe;
     pe.dwSize = sizeof(pe);
     bool found = false;
 
-    if (Process32FirstA(hSnap, &pe)) {
+    if (Process32First(hSnap, &pe)) {
         do {
             for (const char* bad : badProcs) {
                 if (_stricmp(pe.szExeFile, bad) == 0) {
@@ -64,7 +64,7 @@ bool IsSuspiciousProcessRunning() {
                     break;
                 }
             }
-        } while (!found && Process32NextA(hSnap, &pe));
+        } while (!found && Process32Next(hSnap, &pe));
     }
     CloseHandle(hSnap);
     return found;
