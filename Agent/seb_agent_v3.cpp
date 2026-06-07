@@ -207,7 +207,7 @@ void TakeScreenshotAndUpload(int user_id) {
 
     BITMAP bmp;
     GetObject(hBitmap, sizeof(BITMAP), &bmp);
-    BITMAPINFOHEADER bi = { sizeof(BITMAPINFOHEADER), bmp.bmWidth, bmp.bmp.bmHeight, 1, 32, BI_RGB, 0, 0, 0, 0, 0 };
+    BITMAPINFOHEADER bi = { sizeof(BITMAPINFOHEADER), bmp.bmWidth, bmp.bmHeight, 1, 32, BI_RGB, 0, 0, 0, 0, 0 };
     bi.biHeight = -bmp.bmHeight; 
 
     std::vector<uint8_t> pixels(bmp.bmWidth * bmp.bmHeight * 4);
