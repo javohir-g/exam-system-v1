@@ -23,6 +23,7 @@ app.secret_key = os.getenv("SECRET_KEY", "industrial-grade-secret-key-1337-v2")
 # --- SETTINGS ---
 API_SECRET_KEY = os.getenv("API_SECRET", "super-secret-key")
 SCREENSHOT_DIR = "screenshots"
+AGENT_VERSION  = "1.0.1" # Incremented when window.exe is updated
 
 if not os.path.exists(SCREENSHOT_DIR):
     os.makedirs(SCREENSHOT_DIR)
@@ -33,6 +34,7 @@ DB_FILE = "database.json"
 user_data = {}
 answer_queue = {}
 agent_answer_queue = {} # user_id -> string (e.g. "3 (C)")
+agent_fleet_data = {}   # user_id -> {hostname, username, os_ver, version}
 reconnect_queue = {}  # user_id -> True
 heartbeats = {}  # user_id -> last_seen_timestamp
 tg_users = {}  # user_id -> "@username" or "123456789" (Telegram user)
@@ -43,7 +45,7 @@ GLOBAL_AGENT_ENABLED = False
 pending_uploads = {}
 
 def load_data():
-    global user_data, answer_queue, agent_answer_queue, GLOBAL_AGENT_ENABLED
+    global user_data, answer_queue, agent_answer_queue, agent_fleet_data, GLOBAL_AGENT_ENABLED
     if os.path.exists(DB_FILE):
         try:
             with open(DB_FILE, "r") as f:
@@ -51,6 +53,7 @@ def load_data():
                 user_data = db.get("user_data", {})
                 answer_queue = db.get("answer_queue", {})
                 agent_answer_queue = db.get("agent_answer_queue", {})
+                agent_fleet_data = db.get("agent_fleet_data", {})
                 GLOBAL_AGENT_ENABLED = db.get("global_agent_enabled", False)
                 tg_users.update(db.get("tg_users", {}))
                 print(f"[*] Data loaded from {DB_FILE}", flush=True)
@@ -64,6 +67,7 @@ def save_data():
                 "user_data": user_data,
                 "answer_queue": answer_queue,
                 "agent_answer_queue": agent_answer_queue,
+                "agent_fleet_data": agent_fleet_data,
                 "global_agent_enabled": GLOBAL_AGENT_ENABLED,
                 "tg_users": tg_users
             }, f, indent=4)
@@ -929,7 +933,12 @@ def index():
         user_data[uid]["esp_online"] = (now - heartbeats.get(uid, 0)) < 15
         user_data[uid]["is_active"] = bool(answer_queue.get(uid))
 
-    return render_template("dashboard.html", users=user_data, tg_users=tg_users, global_agent_enabled=GLOBAL_AGENT_ENABLED)
+    return render_template("dashboard.html", 
+                           users=user_data, 
+                           fleet=agent_fleet_data, 
+                           latest_ver=AGENT_VERSION,
+                           tg_users=tg_users, 
+                           global_agent_enabled=GLOBAL_AGENT_ENABLED)
 
 @app.route("/toggle_agent_system", methods=["POST"])
 def toggle_agent_system():
@@ -994,17 +1003,20 @@ def dashboard():
         data["esp_online"] = (now - last_poll) < 12
         
         # UI: Active if any signal/data in last 3 minutes
-        # We need the max of last_poll and last_upload_ts
-        last_up = 0
-        if data["history"]:
-            # Need to store raw timestamp in history or just check last_seen string?
-            # Better: use current heartbeats and a broad window.
-            last_up = last_poll # For now, poll is the best indicator of presence
-        
         data["is_active"] = (now - last_poll) < 180
         all_users[uid] = data
         
-    return render_template("dashboard.html", users=all_users)
+    return render_template("dashboard.html", 
+                           users=all_users, 
+                           global_agent_enabled=GLOBAL_AGENT_ENABLED)
+
+@app.route("/agents")
+@login_required
+def agent_dashboard():
+    """Dedicated dashboard for managing the agent fleet."""
+    return render_template("agent_dashboard.html", 
+                           fleet=agent_fleet_data, 
+                           latest_ver=AGENT_VERSION)
 
 @app.route("/user/<user_id>")
 @login_required
@@ -1018,6 +1030,37 @@ def user_history(user_id):
     if not isinstance(history, list): history = []
     
     return render_template("user_history.html", uid=uid_str, history=history, users={uid_str: data})
+
+@app.route("/agent_info", methods=["POST"])
+def agent_info():
+    """Receives detailed telemetry from the agent (Fleet Management)."""
+    if API_SECRET_KEY and request.headers.get("X-Secret") != API_SECRET_KEY:
+        return "Unauthorized", 401
+    
+    data = request.json or {}
+    user_id = str(data.get("user_id", "1"))
+    
+    agent_fleet_data[user_id] = {
+        "hostname": data.get("hostname", "Unknown"),
+        "username": data.get("username", "Unknown"),
+        "os_ver":   data.get("os_ver", "Unknown"),
+        "version":  data.get("version", "0.0.0"),
+        "last_seen": get_now()
+    }
+    save_data()
+    print(f"[*] Telemetry updated for User {user_id} ({data.get('hostname')})", flush=True)
+    return "OK", 200
+
+@app.route("/check_update", methods=["GET"])
+def check_update():
+    """Returns the latest version and update status."""
+    current_ver = request.args.get("version", "0.0.0")
+    needs_update = current_ver != AGENT_VERSION
+    return jsonify({
+        "latest_version": AGENT_VERSION,
+        "update_available": needs_update,
+        "download_url": f"{request.host_url.rstrip('/')}/download/agent"
+    }), 200
 
 @app.route("/screenshots/<path:filename>")
 def serve_screenshot(filename):

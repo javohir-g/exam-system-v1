@@ -397,6 +397,7 @@
     <header>
         <h1>SCREEN FROG</h1>
         <div class="stats">
+            <a href="/agents" style="text-decoration: none; color: var(--accent); font-size: 0.75rem; font-weight: 800; padding: 4px 12px; border-radius: 6px; border: 1px solid var(--glass-border); margin-right: 8px;">FLEET MGMT</a>
             <button id="agent-toggle" onclick="toggleAgentSystem()" style="cursor: pointer; background: {% if global_agent_enabled %}rgba(16, 185, 129, 0.1){% else %}rgba(239, 68, 68, 0.1){% endif %}; color: {% if global_agent_enabled %}#10b981{% else %}#ef4444{% endif %}; padding: 4px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 800; border: 1px solid {% if global_agent_enabled %}rgba(16, 185, 129, 0.2){% else %}rgba(239, 68, 68, 0.2){% endif %}; transition: 0.2s;">
                 Agent System: {% if global_agent_enabled %}ON{% else %}OFF{% endif %}
             </button>

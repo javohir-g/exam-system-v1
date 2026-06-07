@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Fleet | SCREEN FROG</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-deep: #020617;
+            --bg-radial: radial-gradient(circle at top center, #0f172a, #020617);
+            --accent: #38bdf8;
+            --glass-bg: rgba(255, 255, 255, 0.02);
+            --glass-border: rgba(255, 255, 255, 0.06);
+            --text-main: #f8fafc;
+            --text-dim: #64748b;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --card-radius: 12px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: var(--bg-radial);
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            background-size: cover;
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+        }
+
+        header {
+            background: rgba(2, 6, 23, 0.8);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--glass-border);
+            padding: 16px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        header h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.2rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #fff, var(--accent));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .nav-links { display: flex; gap: 20px; }
+        .nav-links a {
+            text-decoration: none;
+            color: var(--text-dim);
+            font-size: 0.8rem;
+            font-weight: 600;
+            transition: 0.2s;
+        }
+        .nav-links a:hover, .nav-links a.active { color: var(--accent); }
+
+        .container {
+            padding: 32px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .stat-card {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            padding: 20px;
+            border-radius: var(--card-radius);
+        }
+
+        .stat-label { font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 4px; }
+        .stat-value { font-size: 1.5rem; font-weight: 700; font-family: 'Outfit', sans-serif; }
+
+        .fleet-table-container {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--card-radius);
+            overflow: hidden;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+
+        th {
+            background: rgba(255,255,255,0.02);
+            text-align: left;
+            padding: 16px;
+            color: var(--text-dim);
+            font-weight: 600;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        td {
+            padding: 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        .dot-online { background: var(--success); box-shadow: 0 0 8px var(--success); }
+        .dot-offline { background: #334155; }
+
+        .badge-ver {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 700;
+        }
+        .ver-ok { background: rgba(16, 185, 129, 0.1); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.2); }
+        .ver-warn { background: rgba(245, 158, 11, 0.1); color: var(--warning); border: 1px solid rgba(245, 158, 11, 0.2); }
+
+        .btn-refresh {
+            background: var(--accent);
+            color: #000;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .btn-refresh:hover { opacity: 0.9; transform: translateY(-1px); }
+
+        @media (max-width: 768px) {
+            .stats-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>SCREEN FROG</h1>
+        <nav class="nav-links">
+            <a href="/dashboard">Dashboard</a>
+            <a href="/agents" class="active">Fleet Management</a>
+        </nav>
+        <button class="btn-refresh" onclick="location.reload()">REFRESH DATA</button>
+    </header>
+
+    <div class="container">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Total Agents</div>
+                <div class="stat-value">{{ fleet|length }}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Active (Online)</div>
+                <div class="stat-value" id="online-count">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">System Version</div>
+                <div class="stat-value">v{{ latest_ver }}</div>
+            </div>
+        </div>
+
+        <div class="fleet-table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Agent Name / Node</th>
+                        <th>User</th>
+                        <th>System Info</th>
+                        <th>Version</th>
+                        <th>Status</th>
+                        <th>Last Heartbeat</th>
+                    </tr>
+                </thead>
+                <tbody id="fleet-body">
+                    {% for nid, f in fleet.items() %}
+                    <tr>
+                        <td>
+                            <div style="font-weight: 700; color: var(--accent);">{{ f.hostname }}</div>
+                            <div style="font-size: 0.65rem; color: var(--text-dim);">Node ID: #{{ nid }}</div>
+                        </td>
+                        <td>{{ f.username }}</td>
+                        <td>
+                            <div style="font-size: 0.75rem;">{{ f.os_ver }}</div>
+                        </td>
+                        <td>
+                            <span class="badge-ver {% if f.version == latest_ver %}ver-ok{% else %}ver-warn{% endif %}">
+                                v{{ f.version }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="status-indicator" data-seen="{{ f.last_seen }}">
+                                <span class="status-dot"></span>
+                                <span class="status-text">Checking...</span>
+                            </span>
+                        </td>
+                        <td style="font-size: 0.75rem; color: var(--text-dim);">{{ f.last_seen }}</td>
+                    </tr>
+                    {% endfor %}
+                    {% if not fleet %}
+                    <tr>
+                        <td colspan="6" style="padding: 48px; text-align: center; color: var(--text-dim); font-style: italic;">
+                            No agent telemetry received yet. Deploy window.exe to see data here.
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        function updateStatus() {
+            const now = new Date();
+            let online = 0;
+            document.querySelectorAll('.status-indicator').forEach(el => {
+                const lastSeenStr = el.dataset.seen;
+                if (!lastSeenStr) return;
+                
+                // Parse "YYYY-MM-DD HH:MM:SS"
+                const lastSeen = new Date(lastSeenStr.replace(' ', 'T'));
+                const diff = (now - lastSeen) / 1000; // seconds
+
+                const dot = el.querySelector('.status-dot');
+                const text = el.querySelector('.status-text');
+
+                if (diff < 90) { // Consider online if seen in last 90s (polling + telemetry window)
+                    dot.className = 'status-dot dot-online';
+                    text.textContent = 'Online';
+                    text.style.color = 'var(--success)';
+                    online++;
+                } else {
+                    dot.className = 'status-dot dot-offline';
+                    text.textContent = 'Offline';
+                    text.style.color = 'var(--text-dim)';
+                }
+            });
+            document.getElementById('online-count').textContent = online;
+        }
+
+        updateStatus();
+        setInterval(updateStatus, 5000);
+    </script>
+</body>
+</html>
