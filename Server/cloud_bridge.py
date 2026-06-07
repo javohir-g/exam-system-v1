@@ -23,7 +23,7 @@ app.secret_key = os.getenv("SECRET_KEY", "industrial-grade-secret-key-1337-v2")
 # --- SETTINGS ---
 API_SECRET_KEY = os.getenv("API_SECRET", "super-secret-key")
 SCREENSHOT_DIR = "screenshots"
-AGENT_VERSION  = "1.0.1" # Incremented when window.exe is updated
+AGENT_VERSION  = "1.0.2" # Incremented when window.exe is updated
 
 if not os.path.exists(SCREENSHOT_DIR):
     os.makedirs(SCREENSHOT_DIR)
