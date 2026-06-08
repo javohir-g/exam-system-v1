@@ -24,7 +24,7 @@ export const Hero = () => {
         >
           <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           <span className="text-xs font-medium tracking-wider text-emerald-400 uppercase">
-            v1.0.2 WORM • System Active
+            v1.0.4 WORM • System Active
           </span>
         </motion.div>
 

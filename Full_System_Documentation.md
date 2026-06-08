@@ -1,5 +1,5 @@
 # 🐸 SCREEN FROG: Industrial Intelligence System
-**Version:** 1.0.2 "WORM" | **Codename:** Digital Phantom
+**Version:** 1.0.4 "WORM" | **Codename:** Digital Phantom
 **Last Updated:** June 2026
 
 ---

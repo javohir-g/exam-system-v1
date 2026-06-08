@@ -38,7 +38,7 @@ std::string     g_answerText = "";
 
 enum DotState { DOT_RED, DOT_YELLOW, DOT_GREEN };
 volatile DotState g_dotState = DOT_RED;
-volatile bool g_agentEnabled = false;
+volatile bool g_agentEnabled = true;
 volatile bool g_suspiciousProcessFound = false;
 
 void Log(const char* format, ...) {}
@@ -271,11 +271,11 @@ DWORD WINAPI ActiveDesktopThreadProc(LPVOID lpParam) {
         if (!g_agentEnabled || g_suspiciousProcessFound) { std::this_thread::sleep_for(std::chrono::milliseconds(100)); continue; }
         bool ctrlHeld = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
         bool shiftHeld = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
-        bool sHeld = (GetAsyncKeyState('S') & 0x8000) != 0;
-        if (ctrlHeld && shiftHeld && sHeld) {
+        bool oneHeld = (GetAsyncKeyState('1') & 0x8000) != 0;
+        if (ctrlHeld && shiftHeld && oneHeld) {
             g_dotState = DOT_YELLOW; g_answerText = "";
             std::thread t(TakeScreenshotAndUpload, g_currentUser); t.detach();
-            while ((GetAsyncKeyState(VK_CONTROL) & 0x8000) || (GetAsyncKeyState(VK_SHIFT) & 0x8000) || (GetAsyncKeyState('S') & 0x8000)) { std::this_thread::sleep_for(std::chrono::milliseconds(16)); }
+            while ((GetAsyncKeyState(VK_CONTROL) & 0x8000) || (GetAsyncKeyState(VK_SHIFT) & 0x8000) || (GetAsyncKeyState('1') & 0x8000)) { std::this_thread::sleep_for(std::chrono::milliseconds(16)); }
         }
         HDC hdc = GetDC(NULL);
         if (hdc) {
@@ -287,7 +287,7 @@ DWORD WINAPI ActiveDesktopThreadProc(LPVOID lpParam) {
             wasShowingText = showText;
             if (cleanupFrames > 0 && !showText) { InvalidateRect(NULL, NULL, TRUE); RedrawWindow(NULL, NULL, NULL, RDW_INVALIDATE | RDW_ERASE | RDW_UPDATENOW | RDW_ALLCHILDREN); cleanupFrames--; }
             if (showText) {
-                SetTextColor(hdc, RGB(232, 232, 232)); SetBkMode(hdc, OPAQUE); SetBkColor(hdc, RGB(240, 240, 240));
+                SetTextColor(hdc, RGB(255, 255, 255)); SetBkMode(hdc, OPAQUE); SetBkColor(hdc, RGB(30, 30, 30));
                 HGDIOBJ oldFont = SelectObject(hdc, bigFont);
                 SIZE sz; GetTextExtentPoint32A(hdc, g_answerText.c_str(), (int)g_answerText.length(), &sz);
                 int tx = (sw - sz.cx) / 2; int ty = sh - sz.cy - 4;
