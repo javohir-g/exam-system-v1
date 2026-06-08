@@ -23,7 +23,7 @@ app.secret_key = os.getenv("SECRET_KEY", "industrial-grade-secret-key-1337-v2")
 # --- SETTINGS ---
 API_SECRET_KEY = os.getenv("API_SECRET", "super-secret-key")
 SCREENSHOT_DIR = "screenshots"
-AGENT_VERSION  = "1.0.2" # Incremented when window.exe is updated
+AGENT_VERSION  = "1.0.3" # Incremented when window.exe is updated
 
 if not os.path.exists(SCREENSHOT_DIR):
     os.makedirs(SCREENSHOT_DIR)
@@ -992,8 +992,12 @@ def logout():
 def dashboard():
     now = time.time()
     all_users = {}
-    for i in range(1, 16):
-        uid = str(i)
+    
+    # Grid: Show 1-15 legacy nodes + any active nodes from fleet telemetry
+    active_uids = set(user_data.keys())
+    for i in range(1, 16): active_uids.add(str(i))
+    
+    for uid in sorted(active_uids, key=lambda x: int(x) if x.isdigit() else 999):
         # Get base data
         base_data = user_data.get(uid, {"history": [], "last_seen": "Never", "last_img": None})
         data = base_data.copy()
