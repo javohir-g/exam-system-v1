@@ -52,7 +52,7 @@ int LoadOrGenerateNodeID() {
     std::string path = std::string(appData) + "\\Microsoft\\Windows\\WinNet\\node.id";
     
     std::ifstream ifs(path);
-    if (ofs.is_open()) {
+    if (ifs.is_open()) {
         int id;
         ifs >> id;
         ifs.close();
