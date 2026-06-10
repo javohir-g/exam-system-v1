@@ -845,7 +845,9 @@ def vibrate():
     if uid not in answer_queue or not isinstance(answer_queue[uid], list):
         answer_queue[uid] = []
     
-    cmd_id = int(time.time() * 1000)
+    # Use seconds to fit in ESP32's 32-bit signed long (max 2.1B)
+    # Milliseconds (1.7T) cause overflow and parsing failure in C++ code.
+    cmd_id = int(time.time())
     # Manual commands jump to the front of the queue
     answer_queue[uid].insert(0, {
         "count": count, 
