@@ -272,6 +272,9 @@ def poll():
         if request.args.get("secret") != API_SECRET_KEY:
             return "Unauthorized", 401
     
+    # Reload data from disk to ensure sync between workers
+    load_data()
+    
     user_id = request.args.get("user_id")
     rssi = request.args.get("rssi")
     ssid = request.args.get("ssid", "").replace("%20", " ")
@@ -296,8 +299,8 @@ def poll():
         print(f"[*] Sending reconnect command to Node {uid}", flush=True)
         return jsonify({"count": 0, "count2": 0, "cmd_id": 0, "reconnect": True}), 200
     
-    # answer_queue[user_id] is now a list
-    queue = answer_queue.get(user_id, [])
+    # answer_queue is now a list
+    queue = answer_queue.get(uid, [])
     if not isinstance(queue, list):
         queue = []
 
@@ -310,9 +313,9 @@ def poll():
         is_num = data.get("is_num", False)
         is_neg = data.get("is_negative", False)
         
-        answer_queue[user_id] = queue
+        answer_queue[uid] = queue
         save_data()
-        print(f"[*] Polled User {user_id}: {count}/{count2} (Num: {is_num}, Neg: {is_neg})", flush=True)
+        print(f"[*] Polled Node {uid}: {count}/{count2} (Num: {is_num}, Neg: {is_neg}, cmd_id: {cmd_id})", flush=True)
         return jsonify({
             "count": count, 
             "answer": count,  # Synonym for old firmware
@@ -818,21 +821,40 @@ def reconnect_node():
 @app.route("/vibrate", methods=["GET", "POST"])
 def vibrate():
     """Manually add a vibration command to the queue."""
-    user_id = request.args.get("user_id") or (request.json or {}).get("user_id")
-    count = request.args.get("count", 1) or (request.json or {}).get("count", 1)
+    # Robust extraction from both args and JSON
+    user_id = request.args.get("user_id")
+    if not user_id and request.json:
+        user_id = request.json.get("user_id")
     
-    if not user_id: return "Missing user_id", 400
+    count = request.args.get("count")
+    if not count and request.json:
+        count = request.json.get("count")
+    
+    if not user_id: 
+        print("[!] Manual vibration failed: Missing user_id", flush=True)
+        return "Missing user_id", 400
+        
     uid = str(user_id)
-    count = int(count)
+    try:
+        count = int(count) if count is not None else 1
+    except (ValueError, TypeError):
+        count = 1
     
-    if uid not in answer_queue:
+    if uid not in answer_queue or not isinstance(answer_queue[uid], list):
         answer_queue[uid] = []
     
     cmd_id = int(time.time() * 1000)
-    answer_queue[uid].insert(0, {"count": count, "count2": 0, "is_num": count > 9, "is_negative": False, "cmd_id": cmd_id})
+    # Manual commands jump to the front of the queue
+    answer_queue[uid].insert(0, {
+        "count": count, 
+        "count2": 0, 
+        "is_num": count > 9, 
+        "is_negative": False, 
+        "cmd_id": cmd_id
+    })
     save_data()
-    print(f"[*] Manual vibration {count} queued for Node {uid}", flush=True)
-    return jsonify({"status": "queued"}), 200
+    print(f"[*] Manual vibration {count} queued for Node {uid} (cmd_id: {cmd_id})", flush=True)
+    return jsonify({"status": "queued", "count": count, "uid": uid, "cmd_id": cmd_id}), 200
 
 
 @app.route("/set_tg_user", methods=["POST"])
