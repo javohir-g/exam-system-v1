@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S.FROG // H.CTRL</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Space+Grotesk:wght@300;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #05070a;
+            --panel: #0d1117;
+            --accent: #00ff41;
+            --accent-dim: rgba(0, 255, 65, 0.1);
+            --border: #1f2937;
+            --text: #e6edf3;
+            --text-dim: #7d8590;
+            --danger: #ff3e3e;
+            --sidebar-w: 220px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: var(--bg); color: var(--text); font-family: 'Space Grotesk', sans-serif; display: flex; font-size: 13px; min-height: 100vh; }
+
+        /* ── SIDEBAR ── */
+        .sidebar { width: var(--sidebar-w); border-right: 1px solid var(--border); height: 100vh; position: fixed; display: flex; flex-direction: column; background: var(--bg); z-index: 1000; transition: transform 0.3s; }
+        .sidebar.open { transform: translateX(0); }
+        .sidebar-header { padding: 20px; border-bottom: 1px solid var(--border); font-family: 'JetBrains Mono', monospace; font-weight: 800; font-size: 1.1rem; }
+        .sidebar-nav { flex: 1; padding: 10px 0; }
+        .nav-item { display: flex; padding: 12px 20px; color: var(--text-dim); text-decoration: none; text-transform: uppercase; font-size: 11px; letter-spacing: 1px; border-left: 2px solid transparent; }
+        .nav-item.active { color: var(--accent); background: var(--accent-dim); border-left-color: var(--accent); }
+        .logout-item { margin-top: auto; border-top: 1px solid var(--border); color: var(--danger); }
+
+        .sidebar-toggle { display: none; background: var(--panel); border: 1px solid var(--border); color: var(--accent); padding: 8px; font-family: 'JetBrains Mono', monospace; font-size: 10px; cursor: pointer; position: fixed; top: 12px; left: 12px; z-index: 1100; }
+        .mobile-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 900; }
+
+        /* ── CONTENT ── */
+        .main-content { flex: 1; margin-left: var(--sidebar-w); display: flex; flex-direction: column; min-width: 0; }
+        .top-bar { padding: 12px 24px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--bg); }
+        .top-bar h2 { font-family: 'JetBrains Mono', monospace; font-size: 1rem; text-transform: uppercase; }
+
+        /* ── NODE REGISTRY ── */
+        .node-registry { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1px; background: var(--border); border-bottom: 1px solid var(--border); }
+        .node-card { background: var(--bg); padding: 20px; display: flex; flex-direction: column; gap: 12px; cursor: pointer; transition: background 0.1s; }
+        .node-card:hover { background: var(--panel); }
+        
+        .node-id { font-family: 'JetBrains Mono', monospace; font-weight: 800; color: var(--accent); font-size: 14px; }
+        .node-status { font-size: 9px; text-transform: uppercase; padding: 2px 6px; border: 1px solid var(--border); width: fit-content; }
+        .online { border-color: var(--accent); color: var(--accent); }
+
+        /* ── MODAL ── */
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 2000; align-items: center; justify-content: center; padding: 20px; }
+        .modal { width: 100%; max-width: 400px; background: var(--panel); border: 1px solid var(--border); display: flex; flex-direction: column; position: relative; }
+        
+        .modal-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .modal-title { font-family: 'JetBrains Mono', monospace; font-weight: 800; color: var(--accent); text-transform: uppercase; }
+        .close-modal { background: transparent; border: none; color: var(--text-dim); font-size: 18px; cursor: pointer; }
+        .close-modal:hover { color: #fff; }
+
+        .modal-body { padding: 30px; display: flex; flex-direction: column; gap: 24px; }
+        
+        .cmd-label { font-size: 10px; color: var(--text-dim); text-transform: uppercase; font-weight: 700; letter-spacing: 1px; }
+        .input-group { display: flex; gap: 1px; background: var(--border); border: 1px solid var(--border); }
+        input { flex: 1; background: var(--bg); border: none; color: var(--text); padding: 15px; font-family: 'JetBrains Mono', monospace; font-size: 20px; outline: none; text-align: center; }
+        
+        .trigger-btn { background: var(--accent); color: var(--bg); border: none; padding: 15px; font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 800; cursor: pointer; text-transform: uppercase; }
+        .trigger-btn:hover { filter: brightness(1.1); }
+        .trigger-btn:disabled { background: var(--border); color: var(--text-dim); cursor: not-allowed; }
+
+        .presets { display: flex; gap: 8px; justify-content: center; }
+        .preset { background: transparent; border: 1px solid var(--border); color: var(--text-dim); padding: 6px 12px; font-size: 11px; font-family: 'JetBrains Mono', monospace; cursor: pointer; transition: all 0.1s; }
+        .preset:hover { border-color: var(--accent); color: var(--accent); }
+
+        .notif { padding: 12px; background: var(--accent-dim); color: var(--accent); font-family: 'JetBrains Mono', monospace; font-weight: 800; font-size: 10px; text-align: center; display: none; }
+
+        @media (max-width: 768px) {
+            .sidebar { transform: translateX(-100%); }
+            .sidebar.open { transform: translateX(0); }
+            .sidebar-toggle { display: block; }
+            .mobile-overlay.active { display: block; }
+            .main-content { margin-left: 0; padding-top: 50px; }
+            .top-bar { padding: 12px; padding-left: 60px; }
+        }
+    </style>
+</head>
+<body>
+<button class="sidebar-toggle" onclick="toggleSidebar()">MENU</button>
+<div class="mobile-overlay" id="overlay" onclick="toggleSidebar()"></div>
+
+<aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">S.FROG // SYS</div>
+    <nav class="sidebar-nav">
+        <a href="/dashboard" class="nav-item">Monitor</a>
+        <a href="/agents" class="nav-item">Fleet_Mgmt</a>
+        <a href="/hardware" class="nav-item active">Hardware_Ctrl</a>
+        <a href="/logout" class="nav-item logout-item">Terminate_Session</a>
+    </nav>
+</aside>
+
+<main class="main-content">
+    <header class="top-bar">
+        <h2>Hardware // Node_Registry</h2>
+        <button class="btn" style="border:1px solid var(--border); background:transparent; color:var(--text); padding:6px 12px; font-family:monospace; font-size:10px; cursor:pointer;" onclick="location.reload()">Sync_Registry</button>
+    </header>
+
+    <div class="node-registry">
+        {% for i in range(1, 16) %}
+        {% set uid = i|string %}
+        {% set node = users[uid] if uid in users else {} %}
+        <div class="node-card" onclick="openControl('{{ uid }}', {{ 'true' if node.esp_online else 'false' }})">
+            <span class="node-id">NODE_{{ "%02d"|format(i) }}</span>
+            <span class="node-status {{ 'online' if node.esp_online else '' }}">{{ 'Live' if node.esp_online else 'Dead' }}</span>
+            <div style="font-size: 9px; color: var(--text-dim); margin-top: 4px; font-family: monospace;">CLICK_TO_CTRL</div>
+        </div>
+        {% endfor %}
+    </div>
+</main>
+
+<!-- CONTROL MODAL -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeControl(event)">
+    <div class="modal" id="ctrl-modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <span class="modal-title" id="modal-node-id">NODE_00 // CTRL</span>
+            <button class="close-modal" onclick="closeControl()">✕</button>
+        </div>
+        <div class="notif" id="notif-bar">COMMAND_EXECUTED_SUCCESSFULLY</div>
+        <div class="modal-body">
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                <span class="cmd-label">Pulse_Count</span>
+                <div class="input-group">
+                    <input type="number" id="vibe-count" value="1" min="1" max="99">
+                    <button class="trigger-btn" id="trigger-btn" onclick="sendVibration()">Trigger</button>
+                </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                <span class="cmd-label">Quick_Presets</span>
+                <div class="presets">
+                    <button class="preset" onclick="setVal(1)">x1</button>
+                    <button class="preset" onclick="setVal(2)">x2</button>
+                    <button class="preset" onclick="setVal(3)">x3</button>
+                    <button class="preset" onclick="setVal(5)">x5</button>
+                    <button class="preset" onclick="setVal(10)">x10</button>
+                </div>
+            </div>
+            
+            <div id="offline-warn" style="color: var(--danger); font-size: 10px; font-family: monospace; text-align: center; display: none;">
+                [WARN] NODE_OFFLINE: COMMAND_MAY_BE_DELAYED
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let activeUid = null;
+
+    function toggleSidebar() {
+        document.getElementById('sidebar').classList.toggle('open');
+        document.getElementById('overlay').classList.toggle('active');
+    }
+
+    function openControl(uid, isOnline) {
+        activeUid = uid;
+        document.getElementById('modal-node-id').textContent = `NODE_${uid.padStart(2, '0')} // CTRL`;
+        document.getElementById('modal-overlay').style.display = 'flex';
+        document.getElementById('vibe-count').value = 1;
+        document.getElementById('offline-warn').style.display = isOnline ? 'none' : 'block';
+    }
+
+    function closeControl(event) {
+        if (!event || event.target.id === 'modal-overlay' || event.target.className === 'close-modal') {
+            document.getElementById('modal-overlay').style.display = 'none';
+            activeUid = null;
+        }
+    }
+
+    function setVal(val) {
+        document.getElementById('vibe-count').value = val;
+    }
+
+    function sendVibration() {
+        if (!activeUid) return;
+        
+        const count = document.getElementById('vibe-count').value;
+        const btn = document.getElementById('trigger-btn');
+        const notif = document.getElementById('notif-bar');
+        
+        btn.disabled = true;
+        
+        fetch('/vibrate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: activeUid, count: count })
+        })
+        .then(r => r.json())
+        .then(data => {
+            notif.style.display = 'block';
+            setTimeout(() => {
+                notif.style.display = 'none';
+                btn.disabled = false;
+            }, 1500);
+        })
+        .catch(err => {
+            alert('ERR: Command Transmission Failed');
+            btn.disabled = false;
+        });
+    }
+</script>
+</body>
+</html>

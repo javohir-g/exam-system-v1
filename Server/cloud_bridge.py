@@ -1023,6 +1023,19 @@ def agent_dashboard():
                            latest_ver=AGENT_VERSION,
                            global_agent_enabled=GLOBAL_AGENT_ENABLED)
 
+@app.route("/hardware")
+@login_required
+def hardware_control():
+    """Manual hardware command interface for ESP32 nodes."""
+    now = time.time()
+    all_users = {}
+    for i in range(1, 16):
+        uid = str(i)
+        data = user_data.get(uid, {"history": [], "last_seen": "Never", "last_img": None}).copy()
+        data["esp_online"] = (now - heartbeats.get(uid, 0)) < 12
+        all_users[uid] = data
+    return render_template("hardware_control.html", users=all_users)
+
 @app.route("/user/<user_id>")
 @login_required
 def user_history(user_id):
