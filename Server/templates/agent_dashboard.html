@@ -3,262 +3,184 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Agent Fleet | SCREEN FROG</title>
+    <title>S.FROG // Fleet</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Space+Grotesk:wght@300;500;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-deep: #020617;
-            --bg-radial: radial-gradient(circle at top center, #0f172a, #020617);
-            --accent: #38bdf8;
-            --glass-bg: rgba(255, 255, 255, 0.02);
-            --glass-border: rgba(255, 255, 255, 0.06);
-            --text-main: #f8fafc;
-            --text-dim: #64748b;
-            --success: #10b981;
-            --warning: #f59e0b;
-            --danger: #ef4444;
-            --card-radius: 12px;
+            --bg: #05070a;
+            --panel: #0d1117;
+            --accent: #00ff41;
+            --accent-dim: rgba(0, 255, 65, 0.15);
+            --border: #1f2937;
+            --text: #e6edf3;
+            --text-dim: #7d8590;
+            --danger: #ff3e3e;
+            --sidebar-w: 220px;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            background: var(--bg-radial);
-            background-repeat: no-repeat;
-            background-attachment: fixed;
-            background-size: cover;
-            color: var(--text-main);
-            font-family: 'Inter', sans-serif;
-            min-height: 100vh;
-        }
+        body { background-color: var(--bg); color: var(--text); font-family: 'Space Grotesk', sans-serif; font-size: 13px; min-height: 100vh; display: flex; }
 
-        header {
-            background: rgba(2, 6, 23, 0.8);
-            backdrop-filter: blur(20px);
-            border-bottom: 1px solid var(--glass-border);
-            padding: 16px 32px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-        }
+        .sidebar { width: var(--sidebar-w); border-right: 1px solid var(--border); height: 100vh; position: fixed; display: flex; flex-direction: column; background: var(--bg); z-index: 1000; transition: transform 0.3s; }
+        .sidebar.open { transform: translateX(0); }
+        .sidebar-header { padding: 20px; border-bottom: 1px solid var(--border); font-family: 'JetBrains Mono', monospace; font-weight: 800; font-size: 1.1rem; }
+        .sidebar-nav { flex: 1; padding: 10px 0; }
+        .nav-item { display: flex; padding: 12px 20px; color: var(--text-dim); text-decoration: none; text-transform: uppercase; font-size: 11px; border-left: 2px solid transparent; }
+        .nav-item.active { color: var(--accent); background: var(--accent-dim); border-left-color: var(--accent); }
+        .logout-item { margin-top: auto; border-top: 1px solid var(--border); color: var(--danger); }
 
-        header h1 {
-            font-family: 'Outfit', sans-serif;
-            font-size: 1.2rem;
-            font-weight: 800;
-            background: linear-gradient(135deg, #fff, var(--accent));
-            -webkit-background-clip: text;
-            background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
+        .sidebar-toggle { display: none; background: var(--panel); border: 1px solid var(--border); color: var(--accent); padding: 8px; font-family: 'JetBrains Mono', monospace; font-size: 10px; cursor: pointer; position: fixed; top: 12px; left: 12px; z-index: 1100; }
+        .mobile-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 900; }
 
-        .nav-links { display: flex; gap: 20px; }
-        .nav-links a {
-            text-decoration: none;
-            color: var(--text-dim);
-            font-size: 0.8rem;
-            font-weight: 600;
-            transition: 0.2s;
-        }
-        .nav-links a:hover, .nav-links a.active { color: var(--accent); }
+        .main-content { flex: 1; margin-left: var(--sidebar-w); display: flex; flex-direction: column; min-width: 0; }
+        .top-bar { padding: 12px 24px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--bg); }
+        .page-title h2 { font-family: 'JetBrains Mono', monospace; font-size: 1rem; text-transform: uppercase; }
+        .header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
-        .container {
-            padding: 32px;
-            max-width: 1200px;
-            margin: 0 auto;
-        }
+        .btn { background: transparent; border: 1px solid var(--border); color: var(--text); padding: 6px 12px; font-family: 'JetBrains Mono', monospace; font-size: 10px; text-transform: uppercase; cursor: pointer; }
+        .btn-active { border-color: var(--accent); color: var(--bg); background: var(--accent); }
 
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 16px;
-            margin-bottom: 32px;
-        }
+        .filter-bar { padding: 12px 24px; border-bottom: 1px solid var(--border); background: var(--panel); display: flex; gap: 12px; flex-wrap: wrap; }
+        .search-input { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 6px 10px; font-family: 'JetBrains Mono', monospace; font-size: 11px; flex: 1; min-width: 150px; outline: none; }
+        .filter-select { background: var(--bg); border: 1px solid var(--border); color: var(--text-dim); padding: 6px; font-family: 'JetBrains Mono', monospace; font-size: 10px; outline: none; }
 
-        .stat-card {
-            background: var(--glass-bg);
-            border: 1px solid var(--glass-border);
-            padding: 20px;
-            border-radius: var(--card-radius);
-        }
+        .stats-row { display: flex; border-bottom: 1px solid var(--border); background: var(--panel); flex-wrap: wrap; }
+        .stat-box { padding: 12px 24px; border-right: 1px solid var(--border); flex: 1; min-width: 120px; }
+        .stat-label { font-size: 9px; color: var(--text-dim); text-transform: uppercase; }
+        .stat-value { font-family: 'JetBrains Mono', monospace; font-size: 1.1rem; font-weight: 800; }
 
-        .stat-label { font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 4px; }
-        .stat-value { font-size: 1.5rem; font-weight: 700; font-family: 'Outfit', sans-serif; }
-
-        .fleet-table-container {
-            background: var(--glass-bg);
-            border: 1px solid var(--glass-border);
-            border-radius: var(--card-radius);
-            overflow: hidden;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.85rem;
-        }
-
-        th {
-            background: rgba(255,255,255,0.02);
-            text-align: left;
-            padding: 16px;
-            color: var(--text-dim);
-            font-weight: 600;
-            border-bottom: 1px solid var(--glass-border);
-        }
-
-        td {
-            padding: 16px;
-            border-bottom: 1px solid rgba(255,255,255,0.03);
-        }
-
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            display: inline-block;
-            margin-right: 8px;
-        }
-        .dot-online { background: var(--success); box-shadow: 0 0 8px var(--success); }
-        .dot-offline { background: #334155; }
-
-        .badge-ver {
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 0.7rem;
-            font-weight: 700;
-        }
-        .ver-ok { background: rgba(16, 185, 129, 0.1); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.2); }
-        .ver-warn { background: rgba(245, 158, 11, 0.1); color: var(--warning); border: 1px solid rgba(245, 158, 11, 0.2); }
-
-        .btn-refresh {
-            background: var(--accent);
-            color: #000;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
-            font-weight: 700;
-            font-size: 0.75rem;
-            cursor: pointer;
-            transition: 0.2s;
-        }
-        .btn-refresh:hover { opacity: 0.9; transform: translateY(-1px); }
+        .fleet-container { flex: 1; overflow: auto; width: 100%; }
+        table { width: 100%; border-collapse: collapse; min-width: 600px; }
+        th { background: var(--bg); text-align: left; padding: 10px 16px; font-size: 9px; text-transform: uppercase; color: var(--text-dim); border-bottom: 1px solid var(--border); position: sticky; top: 0; }
+        td { padding: 10px 16px; border-bottom: 1px solid var(--border); font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+        .agent-id { color: var(--accent); font-weight: 800; }
+        .status-cell { display: flex; align-items: center; gap: 8px; }
+        .indicator { width: 6px; height: 6px; background: #334155; }
+        .ind-online { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
 
         @media (max-width: 768px) {
-            .stats-grid { grid-template-columns: 1fr; }
+            .sidebar { transform: translateX(-100%); }
+            .sidebar.open { transform: translateX(0); }
+            .sidebar-toggle { display: block; }
+            .mobile-overlay.active { display: block; }
+            .main-content { margin-left: 0; padding-top: 50px; }
+            .top-bar { padding: 12px; padding-left: 60px; flex-direction: column; align-items: flex-start; gap: 12px; }
+            .header-actions { width: 100%; justify-content: space-between; }
+            .stat-box { border-bottom: 1px solid var(--border); }
         }
     </style>
 </head>
 <body>
-    <header>
-        <h1>SCREEN FROG</h1>
-        <nav class="nav-links">
-            <a href="/dashboard">Dashboard</a>
-            <a href="/agents" class="active">Fleet Management</a>
-        </nav>
-        <button class="btn-refresh" onclick="location.reload()">REFRESH DATA</button>
+<button class="sidebar-toggle" onclick="toggleSidebar()">MENU</button>
+<div class="mobile-overlay" id="overlay" onclick="toggleSidebar()"></div>
+
+<aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">S.FROG // FLEET</div>
+    <nav class="sidebar-nav">
+        <a href="/dashboard" class="nav-item">Monitor</a>
+        <a href="/agents" class="nav-item active">Fleet_Mgmt</a>
+        <a href="#" class="nav-item">Global_Logs</a>
+        <a href="/logout" class="nav-item logout-item">Terminate_Session</a>
+    </nav>
+</aside>
+
+<main class="main-content">
+    <header class="top-bar">
+        <div class="page-title"><h2>Registry / Fleet</h2></div>
+        <div class="header-actions">
+            <button id="agent-toggle" onclick="toggleAgentSystem()" class="btn {{ 'btn-active' if global_agent_enabled else '' }}">
+                AI: {{ 'ON' if global_agent_enabled else 'OFF' }}
+            </button>
+            <a href="/download/installer" class="btn">Installer</a>
+            <button class="btn" onclick="location.reload()">Sync</button>
+        </div>
     </header>
 
-    <div class="container">
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-label">Total Agents</div>
-                <div class="stat-value">{{ fleet|length }}</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Active (Online)</div>
-                <div class="stat-value" id="online-count">0</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">System Version</div>
-                <div class="stat-value">v{{ latest_ver }}</div>
-            </div>
-        </div>
-
-        <div class="fleet-table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Agent Name / Node</th>
-                        <th>User</th>
-                        <th>System Info</th>
-                        <th>Version</th>
-                        <th>Status</th>
-                        <th>Last Heartbeat</th>
-                    </tr>
-                </thead>
-                <tbody id="fleet-body">
-                    {% for nid, f in fleet.items() %}
-                    <tr>
-                        <td>
-                            <div style="font-weight: 700; color: var(--accent);">{{ f.hostname }}</div>
-                            <div style="font-size: 0.65rem; color: var(--text-dim);">Node ID: #{{ nid }}</div>
-                        </td>
-                        <td>{{ f.username }}</td>
-                        <td>
-                            <div style="font-size: 0.75rem;">{{ f.os_ver }}</div>
-                        </td>
-                        <td>
-                            <span class="badge-ver {% if f.version == latest_ver %}ver-ok{% else %}ver-warn{% endif %}">
-                                v{{ f.version }}
-                            </span>
-                        </td>
-                        <td>
-                            <span class="status-indicator" data-seen="{{ f.last_seen }}">
-                                <span class="status-dot"></span>
-                                <span class="status-text">Checking...</span>
-                            </span>
-                        </td>
-                        <td style="font-size: 0.75rem; color: var(--text-dim);">{{ f.last_seen }}</td>
-                    </tr>
-                    {% endfor %}
-                    {% if not fleet %}
-                    <tr>
-                        <td colspan="6" style="padding: 48px; text-align: center; color: var(--text-dim); font-style: italic;">
-                            No agent telemetry received yet. Deploy window.exe to see data here.
-                        </td>
-                    </tr>
-                    {% endif %}
-                </tbody>
-            </table>
-        </div>
+    <div class="filter-bar">
+        <input type="text" id="agent-search" class="search-input" placeholder="SEARCH..." oninput="filterFleet()">
+        <select id="status-filter" class="filter-select" onchange="filterFleet()">
+            <option value="all">ALL</option>
+            <option value="online">LIVE</option>
+            <option value="offline">LOST</option>
+        </select>
     </div>
 
-    <script>
-        function updateStatus() {
-            const now = new Date();
-            let online = 0;
-            document.querySelectorAll('.status-indicator').forEach(el => {
-                const lastSeenStr = el.dataset.seen;
-                if (!lastSeenStr) return;
-                
-                // Parse "YYYY-MM-DD HH:MM:SS"
-                const lastSeen = new Date(lastSeenStr.replace(' ', 'T'));
-                const diff = (now - lastSeen) / 1000; // seconds
+    <div class="stats-row">
+        <div class="stat-box"><span class="stat-label">Total</span><div class="stat-value">{{ fleet|length }}</div></div>
+        <div class="stat-box"><span class="stat-label">Live</span><div class="stat-value" id="online-count">0</div></div>
+    </div>
 
-                const dot = el.querySelector('.status-dot');
-                const text = el.querySelector('.status-text');
+    <div class="fleet-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Identity</th>
+                    <th>User</th>
+                    <th>Signal</th>
+                    <th>Last_Sync</th>
+                </tr>
+            </thead>
+            <tbody id="fleet-body">
+                {% for nid, f in fleet.items() %}
+                <tr class="fleet-row" data-host="{{ f.hostname }}" data-user="{{ f.username }}" data-seen="{{ f.last_seen }}">
+                    <td><span class="agent-id">{{ f.hostname }}</span></td>
+                    <td>{{ f.username }}</td>
+                    <td>
+                        <div class="status-cell">
+                            <div class="indicator"></div>
+                            <span class="status-label">---</span>
+                        </div>
+                    </td>
+                    <td style="color: var(--text-dim)">{{ f.last_seen }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</main>
 
-                if (diff < 90) { // Consider online if seen in last 90s (polling + telemetry window)
-                    dot.className = 'status-dot dot-online';
-                    text.textContent = 'Online';
-                    text.style.color = 'var(--success)';
-                    online++;
-                } else {
-                    dot.className = 'status-dot dot-offline';
-                    text.textContent = 'Offline';
-                    text.style.color = 'var(--text-dim)';
-                }
-            });
-            document.getElementById('online-count').textContent = online;
-        }
-
-        updateStatus();
-        setInterval(updateStatus, 5000);
-    </script>
+<script>
+    function toggleSidebar() {
+        document.getElementById('sidebar').classList.toggle('open');
+        document.getElementById('overlay').classList.toggle('active');
+    }
+    function updateStatus() {
+        const now = new Date();
+        let online = 0;
+        document.querySelectorAll('.fleet-row').forEach(row => {
+            const lastSeenStr = row.dataset.seen;
+            if (!lastSeenStr) return;
+            const lastSeen = new Date(lastSeenStr.replace(' ', 'T'));
+            const diff = (now - lastSeen) / 1000;
+            const ind = row.querySelector('.indicator');
+            const lbl = row.querySelector('.status-label');
+            const isOnline = diff < 120;
+            row.dataset.online = isOnline ? "true" : "false";
+            if (isOnline) { ind.className = 'indicator ind-online'; lbl.textContent = 'LIVE'; lbl.style.color = 'var(--accent)'; online++; }
+            else { ind.className = 'indicator'; lbl.textContent = 'LOST'; lbl.style.color = 'var(--text-dim)'; }
+        });
+        document.getElementById('online-count').textContent = online;
+        filterFleet();
+    }
+    function filterFleet() {
+        const q = document.getElementById('agent-search').value.toLowerCase();
+        const s = document.getElementById('status-filter').value;
+        document.querySelectorAll('.fleet-row').forEach(row => {
+            const h = row.dataset.host.toLowerCase();
+            const u = row.dataset.user.toLowerCase();
+            const isOn = row.dataset.online === "true";
+            const mQ = h.includes(q) || u.includes(q);
+            const mS = s === "all" || (s === "online" && isOn) || (s === "offline" && !isOn);
+            row.style.display = (mQ && mS) ? "" : "none";
+        });
+    }
+    function toggleAgentSystem() {
+        fetch('/toggle_agent_system', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+        .then(r => r.json()).then(() => window.location.reload());
+    }
+    updateStatus();
+    setInterval(updateStatus, 10000);
+</script>
 </body>
 </html>

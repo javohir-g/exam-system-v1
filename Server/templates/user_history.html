@@ -3,639 +3,100 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Node {{ uid }} | SCREEN FROG</title>
+    <title>S.FROG // U_{{ "%03d"|format(uid|int) }}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Space+Grotesk:wght@300;500;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-deep: #020617;
-            --bg-radial: radial-gradient(circle at top center, #0b1121, #020617);
-            --accent: #38bdf8;
-            --accent-glow: rgba(56, 189, 248, 0.4);
-            --accent-magenta: #f472b6;
-            --avg-violet: #818cf8;
-            --glass-bg: rgba(255, 255, 255, 0.02);
-            --glass-border: rgba(255, 255, 255, 0.08);
-            --glass-hover: rgba(255, 255, 255, 0.05);
-            --text-main: #f8fafc;
-            --text-dim: #94a3b8;
-            --success: #10b981;
-            --warning: #f59e0b;
-            --danger: #ef4444;
+            --bg: #05070a;
+            --panel: #0d1117;
+            --accent: #00ff41;
+            --accent-dim: rgba(0, 255, 65, 0.1);
+            --border: #1f2937;
+            --text: #e6edf3;
+            --text-dim: #7d8590;
+            --sidebar-w: 220px;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: var(--bg); color: var(--text); font-family: 'Space Grotesk', sans-serif; display: flex; font-size: 13px; min-height: 100vh; }
 
-        body {
-            background: var(--bg-radial);
-            background-repeat: no-repeat;
-            background-attachment: fixed;
-            background-size: cover;
-            color: var(--text-main);
-            font-family: 'Inter', -apple-system, sans-serif;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow-x: hidden;
-        }
+        .sidebar { width: var(--sidebar-w); border-right: 1px solid var(--border); height: 100vh; position: fixed; display: flex; flex-direction: column; background: var(--bg); z-index: 1000; transition: transform 0.3s; }
+        .sidebar.open { transform: translateX(0); }
+        .sidebar-nav { flex: 1; padding: 10px 0; }
+        .nav-item { display: flex; padding: 12px 20px; color: var(--text-dim); text-decoration: none; text-transform: uppercase; font-size: 11px; border-left: 2px solid transparent; }
+        .nav-item.active { color: var(--accent); background: var(--accent-dim); border-left-color: var(--accent); }
 
-        /* ── STICKY HEADER ── */
-        header {
-            background: rgba(2, 6, 23, 0.85);
-            backdrop-filter: blur(20px);
-            border-bottom: 1px solid var(--glass-border);
-            padding: 16px 24px;
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
-        }
+        .sidebar-toggle { display: none; background: var(--panel); border: 1px solid var(--border); color: var(--accent); padding: 8px; font-family: 'JetBrains Mono', monospace; font-size: 10px; cursor: pointer; position: fixed; top: 12px; left: 12px; z-index: 1100; }
+        .mobile-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 900; }
 
-        .header-top {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+        .main-content { flex: 1; margin-left: var(--sidebar-w); display: flex; flex-direction: column; min-width: 0; }
+        .top-bar { padding: 12px 24px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--bg); }
+        .top-bar h2 { font-family: 'JetBrains Mono', monospace; font-size: 1rem; text-transform: uppercase; }
 
-        .brand-box {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
-
-        .back-btn {
-            color: var(--text-dim);
-            text-decoration: none;
-            font-size: 0.75rem;
-            font-weight: 700;
-            padding: 8px 14px;
-            background: rgba(255,255,255,0.03);
-            border: 1px solid var(--glass-border);
-            border-radius: 8px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .back-btn:hover {
-            color: var(--accent);
-            border-color: var(--accent);
-            background: rgba(56, 189, 248, 0.1);
-            transform: translateX(-4px);
-        }
-
-        .node-id {
-            font-family: 'Outfit', sans-serif;
-            font-size: 1.25rem;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            background: linear-gradient(135deg, #fff, var(--accent));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .logout-btn {
-            color: var(--danger);
-            text-decoration: none;
-            font-size: 0.7rem;
-            font-weight: 800;
-            padding: 6px 14px;
-            background: rgba(239, 68, 68, 0.05);
-            border: 1px solid rgba(239, 68, 68, 0.1);
-            border-radius: 6px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            transition: 0.2s;
-        }
-
-        .logout-btn:hover {
-            background: rgba(239, 68, 68, 0.15);
-            border-color: var(--danger);
-        }
-
-        /* ── COMMAND BAY ── */
-        .cmd-bay {
-            display: flex;
-            align-items: center;
-            gap: 24px;
-            padding-top: 12px;
-            border-top: 1px solid rgba(255,255,255,0.05);
-        }
-
-        .status-group {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
-
-        .pill {
-            font-size: 0.65rem;
-            font-weight: 800;
-            padding: 4px 10px;
-            border-radius: 20px;
-            background: rgba(255,255,255,0.03);
-            border: 1px solid var(--glass-border);
-            color: var(--text-dim);
-            letter-spacing: 0.5px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .pill-on { color: var(--success); border-color: rgba(16, 185, 129, 0.3); background: rgba(16, 185, 129, 0.08); }
-        .pill-off { color: var(--danger); border-color: rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.08); }
-
-        .control-group {
-            margin-left: auto;
-            display: flex;
-            gap: 12px;
-            align-items: center;
-        }
-
-        .control-label {
-            font-size: 0.65rem;
-            font-weight: 800;
-            color: var(--text-dim);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .v-input {
-            width: 50px;
-            background: rgba(0,0,0,0.4);
-            border: 1px solid var(--glass-border);
-            color: #fff;
-            padding: 6px;
-            border-radius: 6px;
-            text-align: center;
-            font-weight: 700;
-            outline: none;
-            transition: 0.2s;
-        }
-
-        .v-input:focus { border-color: var(--accent); box-shadow: 0 0 10px rgba(56, 189, 248, 0.2); }
-
-        .btn-op {
-            background: var(--text-main);
-            color: var(--bg-deep);
-            border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
-            font-size: 0.75rem;
-            font-weight: 800;
-            cursor: pointer;
-            text-transform: uppercase;
-            transition: 0.2s;
-        }
-
-        .btn-op:hover { background: var(--accent); transform: translateY(-1px); box-shadow: 0 5px 15px var(--accent-glow); }
-
-        .btn-ghost {
-            background: transparent;
-            color: var(--text-dim);
-            border: 1px solid var(--glass-border);
-            padding: 8px 16px;
-            border-radius: 6px;
-            font-size: 0.75rem;
-            font-weight: 800;
-            cursor: pointer;
-            text-transform: uppercase;
-            transition: 0.2s;
-        }
-
-        .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
-
-        /* ── SIGNAL MONITOR (MINI) ── */
-        .sig-monitor {
-            display: flex;
-            align-items: flex-end;
-            gap: 2px;
-            height: 12px;
-            margin-left: 8px;
-        }
-        .s-bar { width: 3px; background: rgba(255,255,255,0.1); border-radius: 1px; }
-        .s-bar:nth-child(1) { height: 30%; }
-        .s-bar:nth-child(2) { height: 50%; }
-        .s-bar:nth-child(3) { height: 70%; }
-        .s-bar:nth-child(4) { height: 85%; }
-        .s-bar:nth-child(5) { height: 100%; }
-        
-        .sig-5 .s-bar { background: var(--success); }
-        .sig-4 .s-bar:nth-child(-n+4) { background: #84cc16; }
-        .sig-3 .s-bar:nth-child(-n+3) { background: var(--warning); }
-        .sig-2 .s-bar:nth-child(-n+2) { background: #f97316; }
-        .sig-1 .s-bar:nth-child(1) { background: var(--danger); }
-
-        /* ── CHAT FEED ── */
-        .chat-container {
-            flex: 1;
-            max-width: 900px;
-            margin: 0 auto;
-            width: 100%;
-            padding: 40px 24px;
-            display: flex;
-            flex-direction: column;
-            gap: 48px;
-        }
-
-        .entry {
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-            animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
-
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .entry-header {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .indicator-dot {
-            width: 8px;
-            height: 8px;
-            background: var(--accent);
-            border-radius: 50%;
-            box-shadow: 0 0 10px var(--accent);
-        }
-
-        .entry-time {
-            font-family: 'Outfit', sans-serif;
-            font-size: 0.8rem;
-            font-weight: 700;
-            color: var(--text-dim);
-            letter-spacing: 0.5px;
-        }
-
-        .transmission-card {
-            background: var(--glass-bg);
-            backdrop-filter: blur(12px);
-            border: 1px solid var(--glass-border);
-            border-radius: 20px;
-            overflow: hidden;
-            display: grid;
-            grid-template-columns: 320px 1fr;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
-            transition: transform 0.3s, border-color 0.3s;
-        }
-
-        .transmission-card:hover { border-color: rgba(255,255,255,0.15); transform: translateY(-4px); }
-
-        .image-bay {
-            background: #000;
-            cursor: zoom-in;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .image-bay img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            opacity: 0.7;
-            transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .image-bay:hover img { opacity: 1; transform: scale(1.05); }
-
-        .image-label {
-            position: absolute;
-            bottom: 12px;
-            left: 12px;
-            background: rgba(0,0,0,0.6);
-            backdrop-filter: blur(4px);
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.6rem;
-            font-weight: 700;
-            color: #fff;
-            pointer-events: none;
-            opacity: 0.8;
-        }
-
-        .result-content {
-            padding: 24px;
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-            position: relative;
-        }
-
-        .result-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .type-tag {
-            font-size: 0.6rem;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 1.5px;
-            padding: 3px 10px;
-            border-radius: 20px;
-            background: rgba(129, 140, 248, 0.1);
-            color: var(--avg-violet);
-            border: 1px solid rgba(129, 140, 248, 0.2);
-        }
-
-        .ans-main {
-            font-family: 'Outfit', sans-serif;
-            font-size: 2rem;
-            font-weight: 800;
-            color: var(--accent-magenta);
-            line-height: 1;
-            text-shadow: 0 0 20px rgba(244, 114, 182, 0.25);
-        }
-
-        .reasoning {
-            font-size: 0.85rem;
-            color: var(--text-dim);
-            line-height: 1.6;
-            font-style: italic;
-        }
-
-        .meta-strip {
-            margin-top: auto;
-            display: flex;
-            gap: 20px;
-            border-top: 1px solid rgba(255,255,255,0.05);
-            padding-top: 16px;
-        }
-
-        .meta-stat {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-        }
-
-        .stat-label {
-            font-size: 0.55rem;
-            font-weight: 800;
-            color: var(--text-dim);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .stat-val {
-            font-size: 0.75rem;
-            font-weight: 700;
-            color: #fff;
-        }
-
-        /* ── TWIN RECON COMPONENT ── */
-        .twin-recon {
-            margin-top: 12px;
-            background: rgba(0,0,0,0.3);
-            border: 1px solid rgba(255,255,255,0.05);
-            border-radius: 12px;
-            padding: 16px;
-        }
-
-        .recon-title {
-            font-size: 0.6rem;
-            font-weight: 800;
-            color: var(--accent);
-            text-transform: uppercase;
-            margin-bottom: 12px;
-            letter-spacing: 1px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .recon-q {
-            font-size: 0.9rem;
-            font-weight: 600;
-            color: #fff;
-            margin-bottom: 12px;
-        }
-
-        .recon-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-        }
-
-        .recon-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 6px 10px;
-            background: rgba(255,255,255,0.02);
-            border-radius: 6px;
-            font-size: 0.75rem;
-        }
-
-        .recon-label { color: var(--text-dim); }
-        .recon-val { color: var(--accent-magenta); font-weight: 700; }
-
-        /* ── LIGHTBOX ── */
-        #lightbox {
-            position: fixed;
-            inset: 0;
-            background: rgba(2,6,23,0.98);
-            z-index: 2000;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            cursor: zoom-out;
-        }
-        #lightbox img { max-width: 95%; max-height: 95%; object-fit: contain; border-radius: 8px; box-shadow: 0 0 100px rgba(0,0,0,0.8); }
-
-        .empty-state {
-            text-align: center;
-            padding: 100px 0;
-            color: var(--text-dim);
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            opacity: 0.5;
-        }
+        .feed { display: flex; flex-direction: column; }
+        .packet { display: grid; grid-template-columns: 300px 1fr; border-bottom: 1px solid var(--border); background: var(--bg); }
+        .packet-visual { background: #000; border-right: 1px solid var(--border); }
+        .packet-visual img { width: 100%; display: block; opacity: 0.8; }
+        .packet-info { padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+        .packet-header { display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--text-dim); }
+        .value { font-family: 'JetBrains Mono', monospace; font-size: 1.8rem; font-weight: 800; color: var(--accent); word-break: break-all; }
+        .reasoning { font-size: 12px; line-height: 1.4; color: var(--text); background: var(--accent-dim); padding: 10px; border-left: 2px solid var(--accent); }
+        .meta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 15px; font-family: 'JetBrains Mono', monospace; }
 
         @media (max-width: 768px) {
-            .transmission-card { grid-template-columns: 1fr; }
-            .image-bay { aspect-ratio: 16/9; }
-            .cmd-bay { flex-direction: column; align-items: stretch; gap: 16px; }
-            .control-group { margin-left: 0; justify-content: space-between; }
-            .header-top { gap: 12px; }
+            .sidebar { transform: translateX(-100%); }
+            .sidebar.open { transform: translateX(0); }
+            .sidebar-toggle { display: block; }
+            .mobile-overlay.active { display: block; }
+            .main-content { margin-left: 0; padding-top: 50px; }
+            .top-bar { padding: 12px; padding-left: 60px; }
+            .packet { grid-template-columns: 1fr; }
+            .packet-visual { border-right: none; border-bottom: 1px solid var(--border); }
+            .value { font-size: 1.4rem; }
         }
     </style>
 </head>
 <body>
+<button class="sidebar-toggle" onclick="toggleSidebar()">MENU</button>
+<div class="mobile-overlay" id="overlay" onclick="toggleSidebar()"></div>
 
-<div id="lightbox" onclick="this.style.display='none'"><img id="lb-img" src=""></div>
+<aside class="sidebar" id="sidebar">
+    <div class="sidebar-header" style="padding:20px; border-bottom:1px solid var(--border); font-family: monospace; font-weight:800;">S.FROG // U_HST</div>
+    <nav class="sidebar-nav">
+        <a href="/dashboard" class="nav-item">Monitor</a>
+        <a href="/agents" class="nav-item">Fleet_Mgmt</a>
+        <a href="/logout" class="nav-item" style="margin-top:auto; color:#ff3e3e; border-top:1px solid var(--border)">Logout</a>
+    </nav>
+</aside>
 
-<header>
-    <div class="header-top">
-        <div class="brand-box">
-            <a href="/dashboard" class="back-btn">← Home</a>
-            <div class="node-id">Node {{ "%02d"|format(uid|int) }}</div>
+<main class="main-content">
+    <header class="top-bar">
+        <h2>U_{{ "%03d"|format(uid|int) }}</h2>
+        <button class="btn" onclick="location.href='/dashboard'" style="border:1px solid var(--border); background:transparent; color:var(--text); padding:6px 12px; font-family:monospace; font-size:10px; cursor:pointer;">Back</button>
+    </header>
+    <div class="feed">
+        {% for entry in history %}
+        <div class="packet">
+            <div class="packet-visual"><img src="/screenshots/{{ entry.filenames[0] }}"></div>
+            <div class="packet-info">
+                <div class="packet-header"><span>PKT_{{ loop.revindex }}</span><span>{{ entry.timestamp }}</span></div>
+                <div class="value">{% if entry.task_type == 'drag' %}{{ entry.matches|length }} MATCH{% else %}{{ entry.answer if entry.answer else 'NULL' }}{% endif %}</div>
+                {% if entry.reasoning %}<div class="reasoning">{{ entry.reasoning }}</div>{% endif %}
+                <div class="meta-grid">
+                    <div style="font-size:9px">CONF: {{ (entry.confidence * 100)|int }}%</div>
+                    <div style="font-size:9px">AGNT: {{ entry.agent[:10] }}</div>
+                </tr>
+            </div>
         </div>
-        <a href="/logout" class="logout-btn">Log Output</a>
+        {% endfor %}
     </div>
-
-    {% set node = users[uid] if users is defined and uid in users else {} %}
-    {% set r = node.rssi|int if node.rssi else 0 %}
-    {% set lv = 0 if not node.esp_online else (5 if r < 0 and r > -60 else 4 if r < 0 and r > -70 else 3 if r < 0 and r > -80 else 2 if r < 0 and r > -90 else 1 if r < 0 else 0) %}
-
-    <div class="cmd-bay">
-        <div class="status-group">
-            <div class="pill {{ 'pill-on' if node.esp_online else 'pill-off' }}">
-                {{ 'TRANSMITTING' if node.esp_online else 'OFFLINE' }}
-            </div>
-            {% if node.ssid %}
-            <div class="pill">📡 {{ node.ssid }}</div>
-            {% endif %}
-            <div class="sig-monitor sig-{{ lv }}" title="{{ r if node.esp_online else '---' }} dBm">
-                <div class="s-bar"></div>
-                <div class="s-bar"></div>
-                <div class="s-bar"></div>
-                <div class="s-bar"></div>
-                <div class="s-bar"></div>
-            </div>
-        </div>
-
-        <div class="control-group">
-            <span class="control-label">Impulse</span>
-            <input type="number" id="vcount" class="v-input" value="1" min="1" max="9">
-            <button class="btn-op" onclick="sendVibrate(event)">Activate</button>
-            <button class="btn-ghost" onclick="sendReconnect(event)">Rescan</button>
-        </div>
-    </div>
-</header>
-
-<div class="chat-container">
-    {% if not history %}
-    <div class="empty-state">No Data Packets Found</div>
-    {% endif %}
-
-    {% for entry in history %}
-    <div class="entry">
-        <div class="entry-header">
-            <div class="indicator-dot"></div>
-            <div class="entry-time">{{ entry.timestamp }}</div>
-        </div>
-
-        <div class="transmission-card">
-            <div class="image-bay" onclick="showLightbox('/screenshots/{{ entry.filenames[0] }}')">
-                <img src="/screenshots/{{ entry.filenames[0] }}" alt="Packet Frame">
-                <div class="image-label">RAW_FRAME_{{ loop.revindex }}</div>
-            </div>
-
-            <div class="result-content">
-                <div class="result-header">
-                    <div style="display: flex; gap: 8px; align-items: center;">
-                        <div class="type-tag">{{ entry.task_type }}</div>
-                        {% if entry.is_negative %}
-                            <div class="type-tag" style="background: rgba(239, 68, 68, 0.1); color: var(--danger); border-color: rgba(239, 68, 68, 0.3);">NEGATIVE</div>
-                        {% endif %}
-                    </div>
-                    <div class="stat-val" style="color: var(--text-dim); font-size: 0.6rem;">VERDICT: {{ entry.verdict }}</div>
-                </div>
-
-                <div class="ans-main">
-                    {% if entry.task_type == 'choice' or entry.task_type == 'number' %}
-                        {{ entry.answer if entry.answer else 'NO_DATA' }}
-                    {% elif entry.task_type == 'drag' %}
-                        <span style="font-size: 1.2rem; vertical-align: middle; opacity: 0.8;">MATCHING:</span> {{ entry.matches|length }} PAIRS
-                    {% else %}
-                        {{ entry.answer_val if entry.answer_val else 'NO_DATA' }}
-                    {% endif %}
-                </div>
-
-                {% if entry.reasoning %}
-                <div class="reasoning">"{{ entry.reasoning }}"</div>
-                {% endif %}
-
-                {% if entry.twin %}
-                <div class="twin-recon">
-                    <div class="recon-title">
-                        <span>🧬 Semantic Reconstruction</span>
-                    </div>
-                    {% if entry.twin.questionText %}
-                    <div class="recon-q">{{ entry.twin.questionText }}</div>
-                    {% endif %}
-                    <div class="recon-grid">
-                        {% for m in entry.matches %}
-                        <div class="recon-item">
-                            <span class="recon-label">Option {{ m.d }}</span>
-                            <span class="recon-val">Item {{ m.s }}</span>
-                        </div>
-                        {% endfor %}
-                    </div>
-                </div>
-                {% endif %}
-
-                <div class="meta-strip">
-                    <div class="meta-stat">
-                        <div class="stat-label">Model A</div>
-                        <div class="stat-val">{{ entry.gpt_res.answer if entry.gpt_res else '---' }}</div>
-                    </div>
-                    <div class="meta-stat">
-                        <div class="stat-label">Model B</div>
-                        <div class="stat-val">{{ entry.claude_res.answer if entry.claude_res else '---' }}</div>
-                    </div>
-                    <div class="meta-stat" style="margin-left: auto;">
-                        <div class="stat-label">Confidence</div>
-                        <div class="stat-val" style="color: var(--accent);">{{ (entry.confidence * 100)|int }}%</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    {% endfor %}
-</div>
-
+</main>
 <script>
-    function showLightbox(src) {
-        document.getElementById('lb-img').src = src;
-        document.getElementById('lightbox').style.display = 'flex';
-    }
-
-    async function sendVibrate(e) {
-        const count = document.getElementById('vcount').value;
-        const btn = e ? e.target : this;
-        btn.textContent = '...';
-        try {
-            const resp = await fetch(`/vibrate?user_id={{ uid }}&count=${count}`);
-            if (resp.ok) {
-                btn.textContent = 'Sent ✓';
-            } else {
-                btn.textContent = 'Err ' + resp.status;
-            }
-            setTimeout(() => btn.textContent = 'Activate', 1500);
-        } catch(err) {
-            btn.textContent = 'Network Error';
-            setTimeout(() => btn.textContent = 'Activate', 2000);
-        }
-    }
-
-    async function sendReconnect(e) {
-        const btn = e ? e.target : this;
-        btn.textContent = '...';
-        try {
-            const resp = await fetch(`/reconnect?user_id={{ uid }}`);
-            if (resp.ok) {
-                btn.textContent = 'Queued ✓';
-            } else {
-                btn.textContent = 'Err ' + resp.status;
-            }
-            setTimeout(() => btn.textContent = 'Rescan', 1500);
-        } catch(err) {
-            btn.textContent = 'Network Error';
-            setTimeout(() => btn.textContent = 'Rescan', 2000);
-        }
+    function toggleSidebar() {
+        document.getElementById('sidebar').classList.toggle('open');
+        document.getElementById('overlay').classList.toggle('active');
     }
 </script>
-
 </body>
 </html>

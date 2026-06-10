@@ -1020,7 +1020,8 @@ def agent_dashboard():
     """Dedicated dashboard for managing the agent fleet."""
     return render_template("agent_dashboard.html", 
                            fleet=agent_fleet_data, 
-                           latest_ver=AGENT_VERSION)
+                           latest_ver=AGENT_VERSION,
+                           global_agent_enabled=GLOBAL_AGENT_ENABLED)
 
 @app.route("/user/<user_id>")
 @login_required
