@@ -316,13 +316,15 @@ def poll():
         answer_queue[uid] = queue
         save_data()
         print(f"[*] Polled Node {uid}: {count}/{count2} (Num: {is_num}, Neg: {is_neg}, cmd_id: {cmd_id})", flush=True)
+        
+        # Ensure values are JSON-serializable and types are explicit for ESP32
         return jsonify({
-            "count": count, 
-            "answer": count,  # Synonym for old firmware
-            "count2": count2, 
-            "cmd_id": cmd_id,
-            "is_num": is_num,
-            "is_negative": is_neg
+            "count": int(count), 
+            "answer": int(count),
+            "count2": int(count2), 
+            "cmd_id": int(cmd_id), # Keep as int, but ensure it's a valid JSON number
+            "is_num": bool(is_num),
+            "is_negative": bool(is_neg)
         }), 200
     
     return jsonify({"count": 0, "answer": 0, "count2": 0, "cmd_id": 0, "is_num": False, "is_negative": False}), 200
